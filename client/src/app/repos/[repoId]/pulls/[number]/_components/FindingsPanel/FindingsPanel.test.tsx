@@ -52,4 +52,28 @@ describe("FindingsPanel (smoke)", () => {
     renderWithIntl(<FindingsPanel findings={[]} prId="pr1" />);
     expect(screen.getByText("No findings match")).toBeInTheDocument();
   });
+
+  describe("severity filter", () => {
+    const MIXED: FindingRecord[] = [
+      ...FINDINGS,
+      { ...FINDINGS[0]!, id: "f2", severity: "WARNING", title: "N+1 query" },
+    ];
+
+    it("lists only findings of the selected severity", () => {
+      renderWithIntl(<FindingsPanel findings={MIXED} prId="pr1" severity="WARNING" />);
+      expect(screen.getByText("N+1 query")).toBeInTheDocument();
+      expect(screen.queryByText("Hardcoded secret")).not.toBeInTheDocument();
+    });
+
+    it("lists everything when no severity is selected", () => {
+      renderWithIntl(<FindingsPanel findings={MIXED} prId="pr1" severity={null} />);
+      expect(screen.getByText("N+1 query")).toBeInTheDocument();
+      expect(screen.getByText("Hardcoded secret")).toBeInTheDocument();
+    });
+
+    it("shows the empty state when the run has no finding of that severity", () => {
+      renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" severity="SUGGESTION" />);
+      expect(screen.getByText("No findings match")).toBeInTheDocument();
+    });
+  });
 });

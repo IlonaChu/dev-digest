@@ -6,7 +6,8 @@ import { RunStatus } from "../RunStatus";
 import { RunHistory } from "../RunHistory/RunHistory";
 import { ReviewRunAccordion } from "../ReviewRunAccordion";
 import { s } from "./styles";
-import type { FindingRecord, ReviewRecord, RunSummary, PrCommit } from "@devdigest/shared";
+import { SeverityFilter, countBySeverity } from "../SeverityFilter";
+import type { FindingRecord, ReviewRecord, RunSummary, PrCommit, Severity } from "@devdigest/shared";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 interface FindingsTabProps {
@@ -21,6 +22,9 @@ interface FindingsTabProps {
   /** owner/repo + head sha — used to deep-link a finding's file:line to GitHub. */
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Active severity filter (from `?severity=`); null = show every level. */
+  severity: Severity | null;
+  onSeverityChange: (severity: Severity | null) => void;
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
@@ -37,10 +41,19 @@ export function FindingsTab({
   cancelMutation,
   repoFullName,
   headSha,
+  severity,
+  onSeverityChange,
   onOpenTrace,
   onDelete,
   onRunDone,
 }: FindingsTabProps) {
+  // Counts cover every finding of every run, independent of each panel's local
+  // "hide low confidence" toggle.
+  const severityCounts = React.useMemo(
+    () => countBySeverity(runs.flatMap((r) => r.findings)),
+    [runs],
+  );
+
   const handleCancelAll = useCallback(() => {
     liveRunIds.forEach((id) => cancelMutation.mutate(id));
   }, [liveRunIds, cancelMutation]);
@@ -144,6 +157,9 @@ export function FindingsTab({
       >
         Review runs
       </SectionLabel>
+      {runs.length > 0 && (
+        <SeverityFilter counts={severityCounts} active={severity} onChange={onSeverityChange} />
+      )}
       {runs.length === 0 ? (
         reviewRunning || liveRunIds.length > 0 ? null : (
           <EmptyState
@@ -164,6 +180,7 @@ export function FindingsTab({
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
+            severity={severity}
           />
         ))
       )}
