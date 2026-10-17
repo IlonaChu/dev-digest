@@ -116,16 +116,37 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
     // not surfaced on the list — findings live on the PR detail page.)
     const prIds = rows.map((r) => r.id);
-    const latestReviewByPr = new Map<string, { score: number | null }>();
+    const latestReviewByPr = new Map<
+      string,
+      { score: number | null; costUsd: number | null }
+    >();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ prId: t.reviews.prId, score: t.reviews.score })
+        .select({ prId: t.reviews.prId, score: t.reviews.score, runId: t.reviews.runId })
         .from(t.reviews)
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
       // Rows are newest-first → first seen per PR is the latest review.
+      const latest = new Map<string, { score: number | null; runId: string | null }>();
       for (const rv of reviewRows) {
-        if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { score: rv.score });
+        if (!latest.has(rv.prId)) latest.set(rv.prId, { score: rv.score, runId: rv.runId });
+      }
+      // COST of that one review's run (one extra IN-query, no N+1). Stays null
+      // when the run predates cost tracking or the model had no known price.
+      const runIds = [...latest.values()].flatMap((l) => (l.runId ? [l.runId] : []));
+      const costByRun = new Map<string, number | null>();
+      if (runIds.length > 0) {
+        const runRows = await container.db
+          .select({ id: t.agentRuns.id, costUsd: t.agentRuns.costUsd })
+          .from(t.agentRuns)
+          .where(inArray(t.agentRuns.id, runIds));
+        for (const r of runRows) costByRun.set(r.id, r.costUsd);
+      }
+      for (const [prId, l] of latest) {
+        latestReviewByPr.set(prId, {
+          score: l.score,
+          costUsd: l.runId ? (costByRun.get(l.runId) ?? null) : null,
+        });
       }
     }
 
@@ -153,6 +174,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
+        cost_usd: review ? review.costUsd : null,
       };
     });
   });
