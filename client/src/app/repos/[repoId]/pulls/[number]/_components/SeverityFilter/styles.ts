@@ -1,13 +1,37 @@
 import type { CSSProperties } from "react";
+import type { Severity } from "@devdigest/shared";
+
+const PILL_COLOR: Record<Severity, string> = {
+  CRITICAL: "var(--crit)",
+  WARNING: "var(--warn)",
+  SUGGESTION: "var(--sugg)",
+};
 
 /** Co-located styles for SeverityFilter. */
 export const s = {
+  wrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    marginBottom: 14,
+  } satisfies CSSProperties,
+  pills: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+    fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+  } satisfies CSSProperties,
+  pill: (level: Severity) => ({ color: PILL_COLOR[level] }) satisfies CSSProperties,
+  dot: { color: "var(--text-muted)" } satisfies CSSProperties,
   bar: {
     display: "flex",
     alignItems: "center",
     gap: 8,
     flexWrap: "wrap",
-    marginBottom: 14,
   } satisfies CSSProperties,
   button: (active: boolean, disabled: boolean) =>
     ({
@@ -19,12 +43,4 @@ export const s = {
       cursor: disabled ? "not-allowed" : "pointer",
       opacity: disabled ? 0.45 : 1,
     }) satisfies CSSProperties,
-  clear: {
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: 12,
-    color: "var(--text-muted)",
-    textDecoration: "underline",
-  } satisfies CSSProperties,
 } as const;

@@ -6,4 +6,4 @@ Deep-dives and decision notes for `e2e`: how a subsystem works, why it was built
 - Diagrams: Mermaid (see the `mermaid-diagram` skill).
 
 ## Index
-_(empty)_
+- [flow-runner.md](flow-runner.md) - how `run.ts` loads, executes and reports flows; entry points, env, seed dependency, no-LLM rationale

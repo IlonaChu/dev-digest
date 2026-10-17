@@ -47,3 +47,26 @@ never reviewed or that run has no cost.
 ## Open points / deviations
 - "Latest review" is a single run. With *Review all* (several agents), the list shows one agent's cost,
   not the batch total. A real batch total needs a `batch_id` on `agent_runs`.
+
+## Update 2026-10-17
+Supersedes the PR-list wording in "API / contracts" and "Open points" above (the other contracts are unchanged).
+
+**`cost_usd` on `GET /repos/:id/pulls` is now the SUM over all runs of the PR.** `src/modules/pulls/routes.ts`
+runs one grouped query: `SELECT pr_id, sum(cost_usd) FROM agent_runs WHERE pr_id IN (...) AND status = 'done' GROUP BY pr_id`.
+- Only `status = 'done'` runs count; failed/cancelled runs are excluded.
+- SQL `SUM` ignores `NULL` costs. A PR with no done run, or whose done runs are all unpriced, gets no
+  row and so `cost_usd = null` (never `0`). A PR mixing priced and unpriced done runs shows the sum of the priced ones.
+- This resolves the "Review all shows one agent's cost" open point: several agents (or re-runs) now add up.
+  There is still no `batch_id`, so a batch cannot be separated from earlier runs of the same PR.
+- Pinned by `test/reviews.it.test.ts` (a second run doubles the listed cost: `calls * 0.001 * 2`).
+
+**PR list items now also carry `findings: PrFindingPreview[]`.** They are the findings of the PR's latest
+review (newest `reviews` row with `kind = 'review'`), read with one `IN` query on `findings.review_id`;
+`[]` when the PR was never reviewed. Fields: `id`, `severity`, `category`, `title`, `file`, `start_line`,
+`end_line`, `confidence`, `rationale`. The client uses them for the findings popover on the PR row.
+"Latest review" is one agent's review, so with *Review all* the popover shows only the most recent agent's findings.
+- Contract: `PrFindingPreview` and `PrMeta.findings` (`nullish`, list endpoint only) in
+  `src/vendor/shared/contracts/platform.ts`; mirror to `client/src/vendor/shared/contracts/platform.ts`.
+- `score` still comes from that same latest review. Computing score, findings and cost costs three queries
+  per list call (reviews, findings, grouped cost), none per PR, no LLM call.
+- Pinned by `test/reviews.it.test.ts` (`listed.findings` has the one grounded CRITICAL on `src/config.ts:11`).

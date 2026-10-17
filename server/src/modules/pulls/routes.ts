@@ -1,7 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import type {
+  PrMeta,
+  PrDetail,
+  PrFindingPreview,
+  GitHubClient,
+  PrReviewComment,
+} from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
@@ -111,42 +117,63 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest-review SCORE per PR for the list's score ring. Computed on read
-    // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // Latest-review SCORE + FINDINGS per PR for the list's score ring and findings popover,
+    // and the summed COST of every successful run. Computed on read (no FK denorm); the
+    // list is small, so a few IN-queries + JS grouping are cheap (no N+1, no LLM call).
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<
       string,
-      { score: number | null; costUsd: number | null }
+      { score: number | null; findings: PrFindingPreview[] }
     >();
+    const costByPr = new Map<string, number>();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ prId: t.reviews.prId, score: t.reviews.score, runId: t.reviews.runId })
+        .select({ id: t.reviews.id, prId: t.reviews.prId, score: t.reviews.score })
         .from(t.reviews)
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
       // Rows are newest-first → first seen per PR is the latest review.
-      const latest = new Map<string, { score: number | null; runId: string | null }>();
+      const latest = new Map<string, { id: string; score: number | null }>();
       for (const rv of reviewRows) {
-        if (!latest.has(rv.prId)) latest.set(rv.prId, { score: rv.score, runId: rv.runId });
+        if (!latest.has(rv.prId)) latest.set(rv.prId, { id: rv.id, score: rv.score });
       }
-      // COST of that one review's run (one extra IN-query, no N+1). Stays null
-      // when the run predates cost tracking or the model had no known price.
-      const runIds = [...latest.values()].flatMap((l) => (l.runId ? [l.runId] : []));
-      const costByRun = new Map<string, number | null>();
-      if (runIds.length > 0) {
-        const runRows = await container.db
-          .select({ id: t.agentRuns.id, costUsd: t.agentRuns.costUsd })
-          .from(t.agentRuns)
-          .where(inArray(t.agentRuns.id, runIds));
-        for (const r of runRows) costByRun.set(r.id, r.costUsd);
+
+      const reviewIds = [...latest.values()].map((l) => l.id);
+      const findingsByReview = new Map<string, PrFindingPreview[]>();
+      if (reviewIds.length > 0) {
+        const findingRows = await container.db
+          .select()
+          .from(t.findings)
+          .where(inArray(t.findings.reviewId, reviewIds));
+        for (const f of findingRows) {
+          const list = findingsByReview.get(f.reviewId) ?? [];
+          list.push({
+            id: f.id,
+            severity: f.severity as PrFindingPreview['severity'],
+            category: f.category as PrFindingPreview['category'],
+            title: f.title,
+            file: f.file,
+            start_line: f.startLine,
+            end_line: f.endLine,
+            confidence: f.confidence,
+            rationale: f.rationale,
+          });
+          findingsByReview.set(f.reviewId, list);
+        }
       }
       for (const [prId, l] of latest) {
-        latestReviewByPr.set(prId, {
-          score: l.score,
-          costUsd: l.runId ? (costByRun.get(l.runId) ?? null) : null,
-        });
+        latestReviewByPr.set(prId, { score: l.score, findings: findingsByReview.get(l.id) ?? [] });
+      }
+
+      // COST = SUM over every successful ('done') run of the PR. SUM ignores NULL costs, and a
+      // PR whose done runs are all unpriced yields NULL → no entry here → null, never 0.
+      const costRows = await container.db
+        .select({ prId: t.agentRuns.prId, cost: sql<number | null>`sum(${t.agentRuns.costUsd})` })
+        .from(t.agentRuns)
+        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')))
+        .groupBy(t.agentRuns.prId);
+      for (const c of costRows) {
+        if (c.prId && c.cost != null) costByPr.set(c.prId, Number(c.cost));
       }
     }
 
@@ -174,7 +201,8 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
-        cost_usd: review ? review.costUsd : null,
+        cost_usd: costByPr.get(r.id) ?? null,
+        findings: review ? review.findings : [],
       };
     });
   });

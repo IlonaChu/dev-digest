@@ -6,4 +6,4 @@ Deep-dives and decision notes for `client`: how a subsystem works, why it was bu
 - Diagrams: Mermaid (see the `mermaid-diagram` skill).
 
 ## Index
-_(empty)_
+- [ui-architecture.md](ui-architecture.md) — Server/Client boundaries, data fetching and query keys, URL state, component folder convention, i18n, vendor/ui and vendor/shared, cost display

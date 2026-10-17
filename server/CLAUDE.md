@@ -32,6 +32,9 @@ pnpm db:generate && pnpm db:migrate                   # after editing src/db/sch
 - On boot, runs stuck in `running` are marked failed (assumes a single API instance per DB).
 - `clones/` holds cloned target repos — not our code.
 
-## Docs
-[docs/](docs/README.md) · [specs/](specs/README.md) · [INSIGHTS.md](INSIGHTS.md)
+## Read When
+- [docs/architecture.md](docs/architecture.md) — touching the DI `Container`, adapters, modules or `platform/`
+- [specs/review-flow.md](specs/review-flow.md) — touching reviews, `run-executor`, run status, SSE or the pulls routes
+- [specs/L01-run-cost-badge.md](specs/L01-run-cost-badge.md) — touching cost (`cost_usd`) or the PR list rollup
+- [README.md](README.md) (API map, env) · [INSIGHTS.md](INSIGHTS.md) · [docs/](docs/README.md) · [specs/](specs/README.md)
 Skills: fastify-best-practices · drizzle-orm-patterns · postgresql-table-design

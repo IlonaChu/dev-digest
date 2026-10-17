@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
@@ -59,21 +59,22 @@ describe("FindingsPanel (smoke)", () => {
       { ...FINDINGS[0]!, id: "f2", severity: "WARNING", title: "N+1 query" },
     ];
 
-    it("lists only findings of the selected severity", () => {
-      renderWithIntl(<FindingsPanel findings={MIXED} prId="pr1" severity="WARNING" />);
+    it("counts match the cards listed in the run", () => {
+      renderWithIntl(<FindingsPanel findings={MIXED} prId="pr1" />);
+      const pills = screen.getByTestId("severity-counts");
+      expect(pills).toHaveTextContent("1 Critical");
+      expect(pills).toHaveTextContent("1 Warning");
+    });
+
+    it("lists only findings of the clicked severity and restores the list on a second click", () => {
+      renderWithIntl(<FindingsPanel findings={MIXED} prId="pr1" />);
+      const warning = screen.getByRole("button", { name: /warning/i });
+      fireEvent.click(warning);
       expect(screen.getByText("N+1 query")).toBeInTheDocument();
       expect(screen.queryByText("Hardcoded secret")).not.toBeInTheDocument();
-    });
-
-    it("lists everything when no severity is selected", () => {
-      renderWithIntl(<FindingsPanel findings={MIXED} prId="pr1" severity={null} />);
+      fireEvent.click(warning);
       expect(screen.getByText("N+1 query")).toBeInTheDocument();
       expect(screen.getByText("Hardcoded secret")).toBeInTheDocument();
-    });
-
-    it("shows the empty state when the run has no finding of that severity", () => {
-      renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" severity="SUGGESTION" />);
-      expect(screen.getByText("No findings match")).toBeInTheDocument();
     });
   });
 });

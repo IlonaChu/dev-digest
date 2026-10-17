@@ -13,6 +13,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 ## Codebase Patterns
 <!-- Conventions and architecture decisions (with the reason) not stated in CLAUDE.md -->
 - 2026-10-12 — Map-reduce runs only when the diff is >400 changed lines AND multi-file; single-file diffs always go single-pass. The studio default is `single-pass` (server `REVIEW_STRATEGY`), so map-reduce runs there only if an agent sets `auto`/`map-reduce`.
+- 2026-10-17 — evidence for 2026-10-12 "Map-reduce runs only when…": `src/review/run.ts:117-120` (`auto` → map-reduce only if lines > `DEFAULT_MAP_THRESHOLD_LINES` (`run.ts:30` = 400) AND `diff.files.length > 1`); server default is `REVIEW_STRATEGY = 'single-pass'` (`server/src/modules/reviews/constants.ts:12`, used at `run-executor.ts:197`)
 
 ## Tool & Library Notes
 <!-- Dependency/tool quirks, version-specific behaviour -->
@@ -22,6 +23,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 
 ## Session Notes
 <!-- Wrap-up only: `- YYYY-MM-DD — <task>: <outcome / key learning>` -->
+- 2026-10-17 — HW1 audit: no reviewer-core code changed; only docs/specs added and the evidence line above → nothing else worth recording
 
 ## Open Questions
 <!-- Unresolved or unverified — what to investigate and where -->

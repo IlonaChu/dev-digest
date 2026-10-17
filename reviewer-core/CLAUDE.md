@@ -27,6 +27,9 @@ Consumers (server, CI runner) import the TypeScript source directly via a path a
 - `@devdigest/shared` resolves to `../server/src/vendor/shared` — there is no local copy.
 - `zod` is pinned to this package's own `node_modules` (tsconfig `paths`) to avoid a second instance.
 
-## Docs
-[docs/](docs/README.md) · [specs/](specs/README.md) · [INSIGHTS.md](INSIGHTS.md)
+## Read When
+- [docs/pipeline.md](docs/pipeline.md) — changing pipeline stages, the prompt, providers, or map-reduce
+- [specs/review-contract.md](specs/review-contract.md) — changing inputs/outputs, grounding, or scoring
+- [README.md](README.md) · [INSIGHTS.md](INSIGHTS.md) · [docs/](docs/README.md) · [specs/](specs/README.md)
+
 Skills: zod · typescript-expert · security

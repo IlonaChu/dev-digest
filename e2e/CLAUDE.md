@@ -22,5 +22,7 @@ Base URL: `E2E_BASE_URL` (default `http://localhost:3000`).
 - Flows rely on seed data (e.g. PR `#482`) — if the seed changes, update the flows.
 - Number new flows sequentially (`08-…`).
 
-## Docs
-[docs/](docs/README.md) · [docs/specs/](docs/specs/README.md) · [INSIGHTS.md](INSIGHTS.md)
+## Read When
+- [docs/flow-runner.md](docs/flow-runner.md) — changing `run.ts`, `lib/` or runner behaviour
+- [docs/specs/flows.md](docs/specs/flows.md) — adding or changing a flow, or changing seed data
+- [README.md](README.md) · [docs/](docs/README.md) · [docs/specs/](docs/specs/README.md) · [INSIGHTS.md](INSIGHTS.md)

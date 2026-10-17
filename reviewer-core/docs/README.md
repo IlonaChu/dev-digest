@@ -6,4 +6,4 @@ Deep-dives and decision notes for `reviewer-core`: how a subsystem works, why it
 - Diagrams: Mermaid (see the `mermaid-diagram` skill).
 
 ## Index
-_(empty)_
+- [pipeline.md](pipeline.md) — data flow from diff to GitHub payload: prompt assembly, structured output, grounding, score, map-reduce, purity rule.

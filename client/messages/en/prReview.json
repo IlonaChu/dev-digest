@@ -4,7 +4,7 @@
     "dismissed": "dismissed",
     "suggestedFix": "Suggested fix",
     "accept": "Accept",
-    "dismiss": "Dismiss",
+    "dismiss": "Reject",
     "learn": "Learn",
     "replyToAuthor": "Reply to author",
     "replyPlaceholder": "Reply to the author about this finding…",
@@ -33,7 +33,11 @@
   },
   "severityFilter": {
     "ariaLabel": "Filter findings by severity",
-    "clear": "Clear filter"
+    "level": {
+      "CRITICAL": "Critical",
+      "WARNING": "Warning",
+      "SUGGESTION": "Suggestion"
+    }
   },
   "runReview": {
     "runAll": "Run all enabled agents",
@@ -96,6 +100,7 @@
       "size": "Size",
       "score": "Score",
       "status": "Status",
+      "findings": "Findings",
       "cost": "Cost",
       "updated": "Updated"
     },
@@ -104,12 +109,18 @@
     "errorBody": "The engine returned an error.",
     "emptyTitle": "No pull requests",
     "emptyAllBody": "No open PRs found for this repo yet. Refresh to sync from GitHub.",
-    "emptyStatusBody": "No PRs with status “{status}”."
+    "emptyStatusBody": "No PRs with status “{status}”.",
+    "findings": {
+      "ariaLabel": "{count, plural, one {# finding} other {# findings}} in the latest run",
+      "popoverTitle": "{count, plural, one {# FINDING} other {# FINDINGS}} IN THIS RUN",
+      "confidence": "{value} confidence"
+    }
   },
   "timeline": {
     "goToReview": "Jump to this run’s findings below",
     "openTrace": "Open run trace & logs",
-    "deleteRun": "Delete run"
+    "deleteRun": "Delete run",
+    "findingsAriaLabel": "{count, plural, one {# finding} other {# findings}} in this run"
   },
   "cost": {
     "tokens": "{count} tok",

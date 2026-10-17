@@ -6,3 +6,4 @@ When a spec is implemented, note any deviation at the bottom of the spec.
 
 ## Index
 - [L01-run-cost-badge.md](L01-run-cost-badge.md) — cost of each agent run on the PR list, timeline and trace drawer
+- [review-flow.md](review-flow.md) — full review cycle: trigger, run state machine, persistence, SSE, reads, and the invariants (with pinning tests)

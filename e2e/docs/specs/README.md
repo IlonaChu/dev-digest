@@ -5,4 +5,4 @@ Sections: **Goal** · **Scope** (in / out) · **API / contracts** · **Acceptanc
 When a spec is implemented, note any deviation at the bottom of the spec.
 
 ## Index
-_(empty)_
+- [flows.md](flows.md) - contract of browser flows 01-07, seed dependencies, rules for adding flow 08+, coverage gaps

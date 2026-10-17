@@ -34,8 +34,25 @@ docker compose down -v           # full DB reset
   New alias → add to BOTH `tsconfig.json` and `vitest.config.ts` of the package.
 - Shared Zod contracts are COPIED: `server/src/vendor/shared` is canonical → mirror changes to
   `client/src/vendor/shared`. The copies have already diverged — never assume they are identical.
-- Done = typecheck + tests green in every package you touched; for non-trivial tasks also run the
-  `engineering-insights` wrap-up before reporting done.
+- Done = typecheck + tests green in every package you touched, plus the `engineering-insights` pass
+  (see "Insights (every task)") before reporting done.
+
+## Naming conventions
+- Files/folders: `kebab-case` (`run-executor.ts`, `repo-intel/`, `reviewer-core/`). Exceptions: client component
+  folders and their `.tsx` are `PascalCase` (`RunCostBadge/RunCostBadge.tsx`); Next.js route segments follow the
+  URL (`[repoId]`, `_components/` for page-private code).
+- Tests: `X.test.ts(x)` next to the code (client) or in `test/` (server, reviewer-core); DB-touching server tests
+  are `*.it.test.ts`; e2e flows are `NN-name.flow.json`; feature specs are `L<NN>-<feature>.md`.
+- Code: `camelCase` variables/functions, `PascalCase` types/components/Zod schemas (`Severity`, `FindingRecord`),
+  `UPPER_SNAKE_CASE` constants (`GRID`, `SIZE_COLOR`), `use…` for hooks.
+- Wire/DB: JSON contracts and DB columns are `snake_case` (`cost_usd`, `run_id`); Drizzle fields are `camelCase`
+  (`costUsd`). Map between them at the repository/route boundary, never in the UI.
+- i18n: namespaced `camelCase` keys in `client/messages/en/<ns>.json`, nested by area (`finding.accept`).
+
+## Insights (every task)
+After EVERY task that touches a package — not only big ones — run the `engineering-insights` skill: write any
+non-obvious, verified finding into that package's `INSIGHTS.md` with date and `path:line` evidence, or say
+explicitly that nothing passed the quality gate. Do this as you go, without being asked.
 
 ## Do not touch
 - `server/clones/` — repos cloned by the app (gitignored). Contains OTHER copies of dev-digest;

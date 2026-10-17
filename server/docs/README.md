@@ -6,4 +6,4 @@ Deep-dives and decision notes for `server`: how a subsystem works, why it was bu
 - Diagrams: Mermaid (see the `mermaid-diagram` skill).
 
 ## Index
-_(empty)_
+- [architecture.md](architecture.md) — DI `Container` and adapters, module layering, run bus/jobs, error handling, how `reviewer-core` is consumed, DB/migration workflow

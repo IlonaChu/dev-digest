@@ -27,6 +27,9 @@ pnpm test         # vitest + jsdom + React Testing Library; fetch is mocked
 - `src/vendor/shared` is not the canonical contract: change `server/src/vendor/shared` first,
   then mirror here. The copies already differ.
 
-## Docs
-[docs/](docs/README.md) · [specs/](specs/README.md) · [INSIGHTS.md](INSIGHTS.md)
+## Read When
+- [docs/ui-architecture.md](docs/ui-architecture.md) — adding components/pages, touching Server/Client boundaries or data fetching
+- [specs/pages.md](specs/pages.md) — changing any page's behaviour
+- [specs/L01-run-cost-badge.md](specs/L01-run-cost-badge.md) — touching cost display
+- [README.md](README.md) (route map) · [docs/](docs/README.md) · [specs/](specs/README.md) · [INSIGHTS.md](INSIGHTS.md)
 Skills: next-best-practices · react-best-practices · react-testing-library

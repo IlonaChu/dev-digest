@@ -220,8 +220,18 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     const timeline = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/runs` })).json();
     expect(timeline[0].cost_usd).toBeCloseTo(calls * 0.001, 6);
     const list = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
-    expect(list.find((p: { number: number }) => p.number === 482).cost_usd).toBeCloseTo(
-      calls * 0.001,
+    const listed = list.find((p: { number: number }) => p.number === 482);
+    expect(listed.cost_usd).toBeCloseTo(calls * 0.001, 6);
+    // PR list also carries the latest run's findings for the hover popover.
+    expect(listed.findings).toHaveLength(1);
+    expect(listed.findings[0]).toMatchObject({ severity: 'CRITICAL', file: 'src/config.ts', start_line: 11 });
+
+    // A second successful run ADDS to the PR's cost (sum over all done runs, not just the latest).
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 2 });
+    const summed = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
+    expect(summed.find((p: { number: number }) => p.number === 482).cost_usd).toBeCloseTo(
+      calls * 0.001 * 2,
       6,
     );
 

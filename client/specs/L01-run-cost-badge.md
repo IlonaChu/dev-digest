@@ -18,7 +18,8 @@ Show what each agent run cost, in three places, using data the API already retur
 ## API / contracts
 - Reads `PrMeta.cost_usd`, `RunSummary.cost_usd`, `RunStats.cost_usd` (mirrored into `src/vendor/shared`).
 - `src/lib/cost.ts` — `formatCost(usd)`, `formatTokenCount(n)`:
-  `null` → `—` · `0` → `$0.00` · `≥ 0.01` → 3 decimals · `< 0.01` → 4 decimals · `< 0.0001` → `<$0.0001`.
+  `null` → `—` · `0` → `$0.00` · `≥ 0.01` → 3 decimals · `< 0.01` → 2 significant digits (`$0.0013`,
+  `$0.00013`) · `< 0.000001` → `<$0.000001`.
 - `src/components/RunCostBadge` — `variant: "compact"` (`$0.014`) | `"withTokens"` (`9 119 tok · $0.0013`).
   Tooltip carries the exact value (`Run cost: $0.001342`) so rounding hides nothing.
 - i18n: `prReview.json` › `list.columns.cost`, `cost.*`; `runs.json` › `trace.stat.cost`.
@@ -36,3 +37,10 @@ Show what each agent run cost, in three places, using data the API already retur
   list `$0.003` renders `$0.0030`, drawer `$0.06` renders `$0.060`. Chosen for one rule everywhere.
 - Mockup places COST before a Run Review column that does not exist yet; here it sits before UPDATED.
 - Token separator is a plain space (`9 119`), as in the mockup.
+
+## Update 2026-10-17
+- PR list `cost_usd` is now the SUM of the PR's successful (`done`) runs, not the latest review's run; `null` when there is none (see `server/specs/L01-run-cost-badge.md`).
+- The PR list now has a FINDINGS column (`pulls/_components/FindingsPopover`): severity icons with counts for the latest run; hovering opens a read-only "N FINDINGS IN THIS RUN" popover fed by `PrMeta.findings`. Column order (as in the mockup): Score, Findings, Status, Cost, Updated. This supersedes the earlier "FINDINGS column out of scope" note.
+- Below one cent, cost now shows 2 significant digits instead of 4 decimals. With 4 decimals, two runs of
+  $0.000129 and $0.000134 each read `$0.0001` while their PR sum read `$0.0003`; now they read `$0.00013` and the sum `$0.00026`.
+  The tiny-cost floor moved from `<$0.0001` to `<$0.000001`. Costs ≥ $0.01 are unchanged.

@@ -5,4 +5,4 @@ Sections: **Goal** · **Scope** (in / out) · **API / contracts** · **Acceptanc
 When a spec is implemented, note any deviation at the bottom of the spec.
 
 ## Index
-_(empty)_
+- [review-contract.md](review-contract.md) — inputs, outputs and invariants of `reviewPullRequest`, with the tests that pin each.

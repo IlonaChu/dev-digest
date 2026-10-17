@@ -4,38 +4,44 @@ import { NextIntlClientProvider } from "next-intl";
 import type { Severity } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { SeverityFilter } from "./SeverityFilter";
-import { countBySeverity, parseSeverity } from "./helpers";
+import { countBySeverity } from "./helpers";
 
 afterEach(cleanup);
 
 const COUNTS = { CRITICAL: 3, WARNING: 5, SUGGESTION: 0 };
 
-function renderFilter(active: Severity | null = null, onChange = vi.fn()) {
+function renderFilter(active: Severity | null = null, onChange = vi.fn(), counts = COUNTS) {
   render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      <SeverityFilter counts={COUNTS} active={active} onChange={onChange} />
+      <SeverityFilter counts={counts} active={active} onChange={onChange} />
     </NextIntlClientProvider>,
   );
   return onChange;
 }
 
 describe("SeverityFilter", () => {
-  it("shows a count for each level", () => {
+  it("shows a count pill only for levels that exist", () => {
     renderFilter();
-    expect(screen.getByRole("button", { name: /critical 3/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /warning 5/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /suggestion 0/i })).toBeInTheDocument();
+    const pills = screen.getByTestId("severity-counts");
+    expect(pills).toHaveTextContent("3 Critical");
+    expect(pills).toHaveTextContent("5 Warning");
+    expect(pills).not.toHaveTextContent("Suggestion");
+  });
+
+  it("renders no pill row for a run without findings", () => {
+    renderFilter(null, vi.fn(), { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 });
+    expect(screen.queryByTestId("severity-counts")).not.toBeInTheDocument();
   });
 
   it("selects a level on click", () => {
     const onChange = renderFilter();
-    fireEvent.click(screen.getByRole("button", { name: /warning 5/i }));
+    fireEvent.click(screen.getByRole("button", { name: /warning/i }));
     expect(onChange).toHaveBeenCalledWith("WARNING");
   });
 
   it("clears the filter when the active level is clicked again", () => {
     const onChange = renderFilter("CRITICAL");
-    const critical = screen.getByRole("button", { name: /critical 3/i });
+    const critical = screen.getByRole("button", { name: /critical/i });
     expect(critical).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(critical);
     expect(onChange).toHaveBeenCalledWith(null);
@@ -43,19 +49,10 @@ describe("SeverityFilter", () => {
 
   it("disables a level with no findings", () => {
     const onChange = renderFilter();
-    const suggestion = screen.getByRole("button", { name: /suggestion 0/i });
+    const suggestion = screen.getByRole("button", { name: /suggestion/i });
     expect(suggestion).toBeDisabled();
     fireEvent.click(suggestion);
     expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("offers a clear button only while a filter is active", () => {
-    const onChange = renderFilter("WARNING");
-    fireEvent.click(screen.getByRole("button", { name: "Clear filter" }));
-    expect(onChange).toHaveBeenCalledWith(null);
-    cleanup();
-    renderFilter();
-    expect(screen.queryByRole("button", { name: "Clear filter" })).not.toBeInTheDocument();
   });
 });
 
@@ -72,17 +69,5 @@ describe("countBySeverity", () => {
       { severity: "SUGGESTION" },
     ] as const;
     expect(countBySeverity(findings)).toEqual({ CRITICAL: 1, WARNING: 2, SUGGESTION: 1 });
-  });
-});
-
-describe("parseSeverity", () => {
-  it("accepts known levels", () => {
-    expect(parseSeverity("CRITICAL")).toBe("CRITICAL");
-  });
-
-  it("treats unknown, lowercase and missing values as no filter", () => {
-    expect(parseSeverity("bogus")).toBeNull();
-    expect(parseSeverity("critical")).toBeNull();
-    expect(parseSeverity(null)).toBeNull();
   });
 });

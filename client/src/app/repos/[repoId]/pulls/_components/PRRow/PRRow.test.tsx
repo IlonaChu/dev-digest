@@ -26,6 +26,7 @@ function pr(o: Partial<PrMeta>): PrMeta {
     updated_at: null,
     score: 61,
     cost_usd: 0.014,
+    findings: [],
     ...o,
   };
 }
@@ -39,7 +40,7 @@ function renderRow(p: PrMeta) {
 }
 
 describe("PRRow — COST cell", () => {
-  it("shows the latest review's cost", () => {
+  it("shows the PR's summed run cost", () => {
     renderRow(pr({ cost_usd: 0.014 }));
     expect(screen.getByText("$0.014")).toBeInTheDocument();
   });
@@ -48,5 +49,31 @@ describe("PRRow — COST cell", () => {
     renderRow(pr({ score: null, cost_usd: null }));
     expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+});
+
+describe("PRRow — FINDINGS cell", () => {
+  it("shows severity counts for the latest run and a dash when there are none", () => {
+    const f = (id: string, severity: "CRITICAL" | "WARNING") => ({
+      id,
+      severity,
+      category: "bug" as const,
+      title: id,
+      file: "a.ts",
+      start_line: 1,
+      end_line: 1,
+      confidence: 0.9,
+      rationale: "r",
+    });
+    renderRow(pr({ findings: [f("x", "CRITICAL"), f("y", "CRITICAL"), f("z", "WARNING")] }));
+    expect(screen.getByLabelText("3 findings in the latest run")).toHaveTextContent("2");
+  });
+});
+
+describe("PR list columns", () => {
+  it("puts FINDINGS before STATUS, as in the design mock", async () => {
+    const { COLUMN_KEYS } = await import("../../constants");
+    expect(COLUMN_KEYS.indexOf("findings")).toBeLessThan(COLUMN_KEYS.indexOf("status"));
+    expect(COLUMN_KEYS.indexOf("findings")).toBeGreaterThan(COLUMN_KEYS.indexOf("score"));
   });
 });
