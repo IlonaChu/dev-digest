@@ -18,7 +18,8 @@ Overview + architecture: [README.md](README.md) · Test strategy: [TESTING.md](T
 | docs/agent-prompts/ | System prompts of the built-in reviewer agents |
 | .claude/skills/ | Stack skills — catalog in [.claude/skills/README.md](.claude/skills/README.md) |
 
-Before editing a package, read `<pkg>/CLAUDE.md` if it is not already in context.
+Before editing a package, read `<pkg>/CLAUDE.md` and `<pkg>/INSIGHTS.md` if not already in context,
+and name in one line the insights that apply (or "none").
 
 ## Commands
 ```sh
@@ -33,7 +34,8 @@ docker compose down -v           # full DB reset
   New alias → add to BOTH `tsconfig.json` and `vitest.config.ts` of the package.
 - Shared Zod contracts are COPIED: `server/src/vendor/shared` is canonical → mirror changes to
   `client/src/vendor/shared`. The copies have already diverged — never assume they are identical.
-- Done = typecheck + tests green in every package you touched.
+- Done = typecheck + tests green in every package you touched; for non-trivial tasks also run the
+  `engineering-insights` wrap-up before reporting done.
 
 ## Do not touch
 - `server/clones/` — repos cloned by the app (gitignored). Contains OTHER copies of dev-digest;
@@ -46,4 +48,4 @@ Every package has the same layout:
 - `README.md` — overview + diagrams
 - `docs/` — deep-dives and decision notes
 - `specs/` — feature specs; read the matching one before implementing a lesson (e2e: `docs/specs/`)
-- `INSIGHTS.md` — known gotchas; when you discover a new one, append a dated entry
+- `INSIGHTS.md` — agent-written learnings in 7 fixed sections; append-only via the `engineering-insights` skill
