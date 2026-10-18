@@ -1,0 +1,73 @@
+{
+  "$comment": "Single source of truth: which skill reviews which changed files. A file is routed to a skill when it matches `paths` (and not `exclude`) OR one of its added lines matches a `signals` regex inside `scope`. Every folder in .claude/skills/ must appear here — as a rule set or as `never` — or route.mjs reports it as unrouted.",
+  "ignore": ["server/clones/**", "**/node_modules/**", "**/dist/**", "**/.next/**", "**/pnpm-lock.yaml", "**/package-lock.json"],
+  "groups": {
+    "ui": "UI — client/ (Next.js, React)",
+    "backend": "Backend — server/, reviewer-core/ (layering, Fastify, Drizzle, Postgres)",
+    "cross": "Cross-cutting — contracts, security, TypeScript config"
+  },
+  "skills": {
+    "frontend-architecture": {
+      "group": "ui",
+      "paths": ["client/src/**/*.{ts,tsx}"],
+      "exclude": ["client/src/vendor/**"]
+    },
+    "react-best-practices": {
+      "group": "ui",
+      "paths": ["client/src/**/*.tsx", "client/src/**/use*.ts", "client/src/lib/hooks/**"],
+      "exclude": ["client/src/vendor/**"]
+    },
+    "next-best-practices": {
+      "group": "ui",
+      "paths": ["client/src/app/**", "client/next.config.*", "client/src/i18n/**", "client/src/middleware.ts"],
+      "scope": ["client/**"],
+      "signals": ["['\"]use client['\"]", "['\"]use server['\"]", "from ['\"]next/"]
+    },
+    "react-testing-library": {
+      "group": "ui",
+      "paths": ["client/**/*.test.{ts,tsx}", "client/src/test/**"]
+    },
+    "onion-architecture": {
+      "group": "backend",
+      "paths": ["server/src/**", "reviewer-core/src/**", "server/.dependency-cruiser*"],
+      "exclude": ["server/src/db/migrations/**"]
+    },
+    "fastify-best-practices": {
+      "group": "backend",
+      "paths": ["server/src/modules/*/routes.ts", "server/src/{app,server}.ts", "server/src/platform/**"],
+      "scope": ["server/**"],
+      "signals": ["from ['\"]fastify"]
+    },
+    "drizzle-orm-patterns": {
+      "group": "backend",
+      "paths": ["server/src/db/**", "server/src/modules/**/repository*", "server/src/modules/**/repository/**"],
+      "exclude": ["server/src/db/migrations/**"],
+      "scope": ["server/**"],
+      "signals": ["from ['\"]drizzle-orm"]
+    },
+    "postgresql-table-design": {
+      "group": "backend",
+      "paths": ["server/src/db/schema.ts", "server/src/db/schema/**", "server/src/db/migrations/*.sql"]
+    },
+    "zod": {
+      "group": "cross",
+      "paths": ["server/src/vendor/shared/**", "client/src/vendor/shared/**", "reviewer-core/src/output/**"],
+      "scope": ["server/**", "client/**", "reviewer-core/**"],
+      "signals": ["from ['\"]zod['\"]"]
+    },
+    "security": {
+      "group": "cross",
+      "paths": ["server/src/modules/*/routes.ts", "server/src/adapters/**", "server/src/platform/**", "client/src/lib/api.ts"],
+      "scope": ["server/**", "client/**", "reviewer-core/**"],
+      "signals": ["child_process", "dangerouslySetInnerHTML", "process\\.env", "sql`", "\\bfs\\.", "\\beval\\(", "new Function\\("]
+    },
+    "typescript-expert": {
+      "group": "cross",
+      "paths": ["**/tsconfig*.json", "**/*.d.ts", "**/vitest.config.ts"],
+      "exclude": ["**/next-env.d.ts"]
+    },
+    "mermaid-diagram": { "never": "authoring tool, not a review skill" },
+    "engineering-insights": { "never": "writes INSIGHTS.md, not a review skill" },
+    "pr-self-review": { "never": "this skill" }
+  }
+}

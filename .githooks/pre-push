@@ -1,0 +1,4 @@
+#!/bin/sh
+# Blocks the push unless /pr-self-review recorded a PASS verdict for exactly the code being pushed.
+# Enable once per clone: git config core.hooksPath .githooks
+exec node "$(git rev-parse --show-toplevel)/.claude/skills/pr-self-review/scripts/gate.mjs" --pre-push

@@ -26,6 +26,8 @@ and name in one line the insights that apply (or "none").
 ./scripts/dev.sh                 # Postgres + migrate + seed + API + web (--help for flags)
 cd <pkg> && pnpm typecheck && pnpm test
 docker compose down -v           # full DB reset
+/pr-self-review                  # (in Claude Code) review open changes; a CRITICAL blocks git push / gh pr create
+git config core.hooksPath .githooks   # once per clone: enables the pre-push gate
 ```
 
 ## Rules
