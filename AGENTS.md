@@ -34,8 +34,9 @@ git config core.hooksPath .githooks   # once per clone: enables the pre-push gat
 - NOT a monorepo: each package has its own package.json + lockfile. Run pnpm inside the package, never at root.
 - Cross-package code only via path aliases (`@devdigest/shared`, `@devdigest/reviewer-core`).
   New alias → add to BOTH `tsconfig.json` and `vitest.config.ts` of the package.
-- Shared Zod contracts are COPIED: `server/src/vendor/shared` is canonical → mirror changes to
-  `client/src/vendor/shared`. The copies have already diverged — never assume they are identical.
+- Shared Zod contracts are COPIED: `server/src/vendor/shared` is canonical → edit it, then run
+  `./scripts/sync-shared.sh` to mirror into `client/src/vendor/shared`. CI (`shared-contracts.yml`)
+  fails on drift; never edit the client copy by hand.
 - Done = typecheck + tests green in every package you touched, plus the `engineering-insights` pass
   (see "Insights (every task)") before reporting done.
 - `AGENTS.md` is canonical (root + every package); `CLAUDE.md` next to it is a symlink to it for Claude Code.

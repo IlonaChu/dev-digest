@@ -14,20 +14,13 @@
  * `getUnresolvedReferences` and (via T1.3) `getCallerSignatures`. T2 fills in
  * the rank-driven methods. T3 unlocks `getCriticalPaths` etc.
  *
- * The constructor takes ONLY a Container. No astgrep / depgraph / tokenizer
- * deps are imported here — those land later and plug into this same shell.
+ * The constructor takes ONLY a Container; the parser, clone reads and
+ * tokenizer arrive through its ports (./ports.ts).
  */
 import type { CodeSymbol, RepoRef } from '@devdigest/shared';
 import type { Container } from '../../platform/container.js';
-import { extractEndpoints } from '../../adapters/codeindex/extract.js';
-import {
-  parseImports,
-  parseInvocationHeads,
-  parseSymbols,
-  langForFile,
-} from '../../adapters/astgrep/index.js';
-import { readFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { extname } from 'node:path';
+import type { ParsedImport, ParsedInvocationHead, ParsedSymbol, SourceTree } from './ports.js';
 import { RepoIntelRepository, type FullSymbolRow } from './repository.js';
 import type {
   BlastCallerRow,
@@ -288,9 +281,9 @@ export class RepoIntelService implements RepoIntel {
       // Detect HTTP routes reachable from any caller file (best-effort, just
       // like the legacy blast service).
       for (const file of callerFiles) {
-        const content = await readClone(repo.clonePath, file);
+        const content = await readClone(this.container.sourceTree, repo.clonePath, file);
         if (!content) continue;
-        for (const e of extractEndpoints(content)) endpoints.add(e);
+        for (const e of this.container.codeParser.extractEndpoints(content)) endpoints.add(e);
       }
     }
 
@@ -466,11 +459,11 @@ export class RepoIntelService implements RepoIntel {
     //    call sites, so chasing references for them just wastes work.
     const declaredSymbols = new Map<string, { file: string; kind: string }>();
     for (const file of changedFiles) {
-      if (!langForFile(file)) continue;
-      const source = await readClone(repo.clonePath, file);
+      if (!this.container.codeParser.supports(file)) continue;
+      const source = await readClone(this.container.sourceTree, repo.clonePath, file);
       if (source == null) continue;
       try {
-        for (const s of parseSymbols(file, source)) {
+        for (const s of this.container.codeParser.parseSymbols(file, source)) {
           if (s.kind !== 'function' && s.kind !== 'method' && s.kind !== 'class') continue;
           // Dual-emit (Class.method + method): only store the bare name; the
           // qualified form would double-count callers.
@@ -490,7 +483,7 @@ export class RepoIntelService implements RepoIntel {
     const seen = new Set<string>();
     // Cache caller-file astgrep parses so we don't re-parse the same file per
     // referenced symbol.
-    const callerSymbolsByFile = new Map<string, ReturnType<typeof parseSymbols>>();
+    const callerSymbolsByFile = new Map<string, ParsedSymbol[]>();
 
     for (const [symbolName, decl] of declaredSymbols) {
       if (out.length >= limit) break;
@@ -507,17 +500,17 @@ export class RepoIntelService implements RepoIntel {
         // Parse the caller file once; reuse for further symbols in this loop.
         let callerSyms = callerSymbolsByFile.get(r.fromPath);
         if (callerSyms === undefined) {
-          if (!langForFile(r.fromPath)) {
+          if (!this.container.codeParser.supports(r.fromPath)) {
             callerSymbolsByFile.set(r.fromPath, []);
             callerSyms = [];
           } else {
-            const callerSrc = await readClone(repo.clonePath, r.fromPath);
+            const callerSrc = await readClone(this.container.sourceTree, repo.clonePath, r.fromPath);
             if (callerSrc == null) {
               callerSymbolsByFile.set(r.fromPath, []);
               callerSyms = [];
             } else {
               try {
-                callerSyms = parseSymbols(r.fromPath, callerSrc);
+                callerSyms = this.container.codeParser.parseSymbols(r.fromPath, callerSrc);
               } catch {
                 callerSyms = [];
               }
@@ -588,16 +581,16 @@ export class RepoIntelService implements RepoIntel {
       const ext = extname(file).toLowerCase();
       if (!(SUPPORTED_EXT as readonly string[]).includes(ext)) continue;
 
-      const source = await readClone(repo.clonePath, file);
+      const source = await readClone(this.container.sourceTree, repo.clonePath, file);
       if (source == null) continue;
 
-      let declared: ReturnType<typeof parseSymbols>;
-      let imports: ReturnType<typeof parseImports>;
-      let heads: ReturnType<typeof parseInvocationHeads>;
+      let declared: ParsedSymbol[];
+      let imports: ParsedImport[];
+      let heads: ParsedInvocationHead[];
       try {
-        declared = parseSymbols(file, source);
-        imports = parseImports(file, source);
-        heads = parseInvocationHeads(file, source);
+        declared = this.container.codeParser.parseSymbols(file, source);
+        imports = this.container.codeParser.parseImports(file, source);
+        heads = this.container.codeParser.parseInvocationHeads(file, source);
       } catch {
         // Tree-sitter is lenient but a napi-level failure shouldn't blow up
         // the whole gate. Skip the file (= "no phantoms here" — conservative).
@@ -759,6 +752,6 @@ function enclosingSymbolName(
   return inFile[0]?.name ?? fromPath.split('/').pop() ?? fromPath;
 }
 
-async function readClone(clonePath: string, file: string): Promise<string | null> {
-  return readFile(join(clonePath, file), 'utf8').catch(() => null);
+async function readClone(tree: SourceTree, clonePath: string, file: string): Promise<string | null> {
+  return tree.read(clonePath, file).catch(() => null);
 }

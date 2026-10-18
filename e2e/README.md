@@ -38,7 +38,7 @@ Flows target **read-only seeded data** (the demo repo `acme/payments-api`, PR
 > **Precondition: a freshly-seeded DB.** Flow `02` follows the home redirect to
 > the *first* repo, so it assumes the seeded demo repo is the only one. CI
 > guarantees this — `e2e-web.yml` brings up an empty Postgres and seeds it.
-> Your local dev DB usually has other imported repos, so running `npm test`
+> Your local dev DB usually has other imported repos, so running `pnpm test`
 > straight against it makes flows 02/04/05 land on the wrong repo and fail.
 > **Use the hermetic runner below** — it spins up its own isolated, freshly-seeded
 > stack and leaves your dev DB untouched.
@@ -61,7 +61,7 @@ npm i -g agent-browser && agent-browser install
 # down. Safe to run while your normal dev stack is up — it never touches your
 # dev DB or the devdigest_pgdata volume.
 ./scripts/e2e.sh
-# or: cd e2e && npm install && npm run e2e:hermetic
+# or: cd e2e && pnpm install && pnpm e2e:hermetic
 ```
 
 The isolated Postgres is ephemeral (no persistent volume), so it's empty every
@@ -75,7 +75,7 @@ above). Otherwise prefer the hermetic runner.
 
 ```sh
 ./scripts/dev.sh          # Postgres + API :3001 + web :3000 (seeded)
-cd e2e && npm install && npm test
+cd e2e && pnpm install && pnpm test
 ```
 
 Env knobs:

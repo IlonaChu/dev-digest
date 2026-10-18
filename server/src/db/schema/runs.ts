@@ -1,4 +1,5 @@
-import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision, check } from 'drizzle-orm/pg-core';
 import { workspaces } from './core';
 import { agents } from './agents';
 import { pullRequests } from './pulls';
@@ -20,7 +21,7 @@ export const agentRuns = pgTable('agent_runs', {
   tokensOut: integer('tokens_out'),
   /** USD cost of the run (provider-reported, else tokens × price); null = unknown, not zero. */
   costUsd: doublePrecision('cost_usd'),
-  status: text('status'),
+  status: text('status', { enum: ['running', 'done', 'failed', 'cancelled'] }),
   /** Failure reason when status='failed' (LLM/API error, timeout, quota, …). */
   error: text('error'),
   source: text('source', { enum: ['local', 'ci'] }).notNull().default('local'),
@@ -30,7 +31,12 @@ export const agentRuns = pgTable('agent_runs', {
   score: integer('score'),
   /** Findings that tripped the agent's gate (severity ≥ ciFailOn). */
   blockers: integer('blockers'),
-});
+}, (table) => [
+  check(
+    'agent_runs_status_check',
+    sql`${table.status} in ('running', 'done', 'failed', 'cancelled')`,
+  ),
+]);
 
 /** Whole trace of one run as a SINGLE jsonb document. */
 export const runTraces = pgTable('run_traces', {

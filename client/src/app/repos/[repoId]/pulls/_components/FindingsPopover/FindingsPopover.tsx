@@ -9,7 +9,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon, SEV, SeverityBadge } from "@devdigest/ui";
 import type { PrAgentFindings, PrFindingPreview } from "@devdigest/shared";
-import { countBySeverity, SEVERITY_LEVELS } from "../../[number]/_components/SeverityFilter";
+import { countBySeverity, SEVERITY_LEVELS } from "../../_lib/severity";
 import { flattenGroups, formatConfidence, formatLocation, popoverPosition, sortPreviews } from "./helpers";
 import type { PopoverPosition } from "./helpers";
 import { s } from "./styles";

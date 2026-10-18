@@ -9,7 +9,7 @@ ArchUnit-style tests. Node has no module visibility, so the layer rules are chec
 | File | Role |
 |---|---|
 | `server/.dependency-cruiser.cjs` | forbidden-import rules (below) |
-| `server/.dependency-cruiser-known-violations.json` | baseline of legacy violations (31 on 2026-10-18) |
+| `server/.dependency-cruiser-known-violations.json` | baseline of legacy violations (31 → 0 on 2026-10-18; now `[]`) |
 | `server/package.json` → `arch:check` | `depcruise src --config .dependency-cruiser.cjs --ignore-known --output-type err` |
 | `server/package.json` → `arch:baseline` | `depcruise-baseline …` — rewrites the baseline |
 | `server/test/architecture.test.ts` | runs the same check inside `pnpm test`; also forbids `process.env` outside config/adapters/CLI scripts |

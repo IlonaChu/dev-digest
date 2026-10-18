@@ -1,6 +1,9 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { z } from 'zod';
 import type { SecretsProvider, SecretKey } from '@devdigest/shared';
+
+const StoredSecrets = z.record(z.string(), z.string());
 
 /**
  * LocalSecretsProvider — writable MVP secrets backend.
@@ -25,8 +28,8 @@ export class LocalSecretsProvider implements SecretsProvider {
     if (this.cache) return this.cache;
     let data: Record<string, string> = {};
     try {
-      const parsed = JSON.parse(await readFile(this.filePath, 'utf8'));
-      if (parsed && typeof parsed === 'object') data = parsed as Record<string, string>;
+      const parsed = StoredSecrets.safeParse(JSON.parse(await readFile(this.filePath, 'utf8')));
+      if (parsed.success) data = parsed.data;
     } catch {
       // Missing or unreadable file → no stored overrides yet.
     }

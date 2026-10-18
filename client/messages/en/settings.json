@@ -26,7 +26,29 @@
     "usingDefault": "default",
     "search": "Search models…",
     "liveNote": "Prices are pulled live from OpenRouter — USD per 1M input/output tokens.",
-    "noKeyNote": "Add an OpenRouter API key under API Keys to load the model list and prices."
+    "noKeyNote": "Add an OpenRouter API key under API Keys to load the model list and prices.",
+    "features": {
+      "onboarding": {
+        "label": "Onboarding Tour",
+        "description": "Writes the per-repo onboarding tour."
+      },
+      "review_intent": {
+        "label": "PR Review · Intent",
+        "description": "Derives a PR’s intent and scope before review."
+      },
+      "risk_brief": {
+        "label": "Risk Brief",
+        "description": "Assesses merge risks for a pull request."
+      },
+      "conformance": {
+        "label": "Conformance",
+        "description": "Checks a PR against the project spec."
+      },
+      "conventions": {
+        "label": "Conventions",
+        "description": "Extracts coding conventions from the repo."
+      }
+    }
   },
   "workspace": {
     "title": "Workspace",

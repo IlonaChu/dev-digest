@@ -17,6 +17,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 
 ## Tool & Library Notes
 <!-- Dependency/tool quirks, version-specific behaviour -->
+- 2026-10-18 — same pnpm placeholder as reviewer-core (see `reviewer-core/INSIGHTS.md`): `pnpm-workspace.yaml` had `esbuild: set this to true or false` → now `true`; e2e is pnpm-only (`package-lock.json` removed, `e2e-web.yml` + `scripts/e2e.sh` use pnpm)
 
 ## Recurring Errors & Fixes
 <!-- Error message → root cause → fix -->

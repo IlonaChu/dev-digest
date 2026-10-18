@@ -123,8 +123,8 @@ The layering is checked by dependency-cruiser (`.dependency-cruiser.cjs`, run by
 `repository*` files import Drizzle/`src/db`, modules never import `src/adapters/*`
 or another module, SDKs and `fs` stay in adapters, adapters and `platform/*` (except
 the container) never import modules, and `src/vendor/shared` stays dependency-free.
-The 31 violations that predate the check are listed in
-`.dependency-cruiser-known-violations.json`; the check fails only on new ones. Rules,
+The baseline `.dependency-cruiser-known-violations.json` is empty (the 31 violations
+that predated the check were fixed on 2026-10-18), so any violation fails the check. Rules,
 rationale and the baseline policy: the `onion-architecture` skill
 (`.claude/skills/onion-architecture/`).
 
@@ -141,9 +141,11 @@ by hand. The single `app.setErrorHandler` in `app.ts` maps, in order:
    500 `internal_error` (the raw object is never leaked).
 3. any `ZodError`, matched by `instanceof` **or** by shape (`name === 'ZodError'` plus
    `issues`/`errors`), because `instanceof` fails across duplicate zod instances
-   (shared vs api) → 422. This is what catches `RunRequest.parse()` in the review route.
+   (shared vs api) → 422. This catches service-level `.parse()` calls.
 4. `AppError` → its `statusCode` with `{ error: { code, message, details } }`.
-5. anything else → logged, `err.statusCode ?? 500`, code `internal_error`.
+5. anything else → logged, code `internal_error`. A framework 4xx (rate limit, bad JSON,
+   body too large) keeps its status and message; everything else becomes 500 with the
+   generic message `Internal error`, so SQL or filesystem details never reach the client.
 
 The handler is registered before the modules so the encapsulated module plugins
 inherit it. Health routes: `/health` (liveness) and `/health/ready` (`select 1`, 503 on

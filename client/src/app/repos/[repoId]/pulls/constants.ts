@@ -1,4 +1,4 @@
-import type { PrMeta } from "../../../../lib/types";
+import type { PrMeta } from "@/lib/types";
 
 /** Constants for the PR list page (/repos/:repoId/pulls). */
 
@@ -37,6 +37,15 @@ export const STATUS_FILTERS: { key: string; labelKey: string }[] = [
   { key: "reviewed", labelKey: "reviewed" },
   { key: "stale", labelKey: "stale" },
 ];
+
+/** Open PRs carry a derived review status; everything else is merged/closed. */
+export const OPEN_STATUSES: ReadonlySet<string> = new Set(["needs_review", "reviewed", "stale"]);
+
+/** Status chip shown when the URL has no `?status` — the most actionable filter on open. */
+export const DEFAULT_STATUS = "needs_review";
+
+export const PULL_SORTS = ["newest", "oldest"] as const;
+export type PullSort = (typeof PULL_SORTS)[number];
 
 /** Column header i18n keys (under `list.columns`), in display order. */
 export const COLUMN_KEYS: string[] = [

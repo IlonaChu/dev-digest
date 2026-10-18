@@ -1,8 +1,67 @@
-/* hooks/ barrel — every React Query hook over the F1/feature APIs.
-   Import from "@/lib/hooks" for the platform hooks (settings/repos/pulls/context)
-   or from a domain file directly (e.g. "@/lib/hooks/reviews") — both resolve here. */
-export * from "./core";
-export * from "./agents";
-export * from "./reviews";
-export * from "./trace";
-export * from "./repo-intel";
+/* hooks/ public API — React Query hooks, query options and key factories over
+   the F1/feature APIs. Import from "@/lib/hooks" or from a domain file directly
+   (e.g. "@/lib/hooks/reviews"). Named re-exports only, so the surface is deliberate. */
+export {
+  settingsKeys,
+  settingsQuery,
+  secretsStatusQuery,
+  useSettings,
+  useUpdateSettings,
+  useTestConnection,
+  useSecretsStatus,
+  repoKeys,
+  reposQuery,
+  useRepos,
+  useAddRepo,
+  useRefreshRepo,
+  useDeleteRepo,
+  pullKeys,
+  pullsQuery,
+  pullDetailQuery,
+  usePulls,
+  usePullDetail,
+  contextKeys,
+  useContextFiles,
+  useReindexContext,
+} from "./core";
+export {
+  agentKeys,
+  agentsQuery,
+  agentQuery,
+  useAgents,
+  useAgent,
+  useCreateAgent,
+  useUpdateAgent,
+  useDeleteAgent,
+  useProviderModels,
+  type CreateAgentInput,
+  type UpdateAgentInput,
+} from "./agents";
+export {
+  reviewKeys,
+  prActiveRunsQuery,
+  prRunsQuery,
+  prReviewsQuery,
+  usePrActiveRuns,
+  usePrRuns,
+  usePrReviews,
+  useRunLifecycle,
+  useDeleteRun,
+  useCancelRun,
+  useDeleteReview,
+  usePrComments,
+  useCreatePrComment,
+  useRunReview,
+  useFindingAction,
+  useRunEvents,
+  type ActiveRun,
+  type CreateCommentInput,
+  type RunReviewInput,
+} from "./reviews";
+export { traceKeys, runTraceQuery, useRunTrace } from "./trace";
+export {
+  repoIntelKeys,
+  useRepoIntelStatus,
+  useResyncRepoIntel,
+  type RepoIntelState,
+} from "./repo-intel";

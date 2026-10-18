@@ -7,7 +7,7 @@ import { Providers } from "../lib/providers";
 import { themeNoFlashScript } from "../lib/theme";
 
 export const metadata: Metadata = {
-  title: "DevDigest",
+  title: { default: "DevDigest", template: "%s · DevDigest" },
   description: "Local-first AI PR review tool",
 };
 

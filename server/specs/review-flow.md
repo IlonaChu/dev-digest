@@ -50,7 +50,7 @@ sequenceDiagram
 
 | Method + path | Behaviour |
 |---|---|
-| `POST /pulls/:id/review` | Body `RunRequest` (`agentId` or `all: true`, parsed with `RunRequest.parse(req.body ?? {})`). Rate limit 10/min. `all` = `agentsRepo.listEnabled`; unknown `agentId` = 404; neither = `AppError('invalid_run_request', ..., 400)`. Unknown PR/repo = 404. Returns immediately: `{ pr_id, runs, reviews: [] }`. |
+| `POST /pulls/:id/review` | Body `RunRequest` (`agentId` or `all: true`, validated by `schema.body: RunRequest.nullish()`, an absent body means `{}`). Rate limit 10/min. `all` = `agentsRepo.listEnabled`; unknown `agentId` = 404; neither = `AppError('invalid_run_request', ..., 400)`. Unknown PR/repo = 404. Returns immediately: `{ pr_id, runs, reviews: [] }`. |
 | `GET /runs/:id/events` | SSE, no rate limit. Replays the buffer, streams live, ends on `complete`. Frame: `id=seq`, `event=kind` (`info`/`tool`/`result`/`error`), `data=JSON(RunEvent)`. |
 | `GET /pulls/:id/runs/active` | Runs with `status='running'` for the PR (`run_id, agent_id, agent_name, ran_at`). |
 | `GET /pulls/:id/runs` | All runs of the PR, any status, newest first (`RunSummary`, includes `cost_usd`, `score`, `blockers`, `error`). |

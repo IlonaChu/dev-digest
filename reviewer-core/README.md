@@ -44,7 +44,7 @@ Exported from `src/index.ts`: `assemblePrompt` / `wrapUntrusted` (prompt),
 
 ## Testing
 
-`npm test` (vitest) — hermetic units with a stubbed `LLMProvider`: prompt
+`pnpm test` (vitest) — hermetic units with a stubbed `LLMProvider`: prompt
 assembly, the grounding gate, `toReview` selection, and a full `run`. No keys,
-no network. `npm run typecheck` doubles as the build. See
+no network. `pnpm typecheck` doubles as the build. See
 [`../TESTING.md`](../TESTING.md).

@@ -25,7 +25,7 @@ pnpm test         # vitest + jsdom + React Testing Library; fetch is mocked
 
 ## Gotchas
 - `src/vendor/shared` is not the canonical contract: change `server/src/vendor/shared` first,
-  then mirror here. The copies already differ.
+  then run `../scripts/sync-shared.sh` (CI fails if the copies drift).
 
 ## Read When
 - [docs/ui-architecture.md](docs/ui-architecture.md) — adding components/pages, touching Server/Client boundaries or data fetching

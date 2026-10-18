@@ -4,7 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import type { Severity } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { SeverityFilter } from "./SeverityFilter";
-import { countBySeverity } from "./helpers";
+import { countBySeverity } from "../../../_lib/severity";
 
 afterEach(cleanup);
 

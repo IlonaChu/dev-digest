@@ -25,10 +25,15 @@ import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
+import { PullsRepository } from '../modules/pulls/repository.js';
+import { RepoRepository } from '../modules/repos/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
+import type { CodeParser, SourceTree, Tokenizer } from '../modules/repo-intel/ports.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
-import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { NodeSourceTree } from '../adapters/fs/node-source-tree.js';
+import { AstGrepCodeParser } from '../adapters/astgrep/code-parser.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -51,6 +56,8 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  sourceTree?: SourceTree;
+  codeParser?: CodeParser;
 }
 
 export class Container {
@@ -72,9 +79,13 @@ export class Container {
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
   private _reviewRepo?: ReviewRepository;
+  private _pullsRepo?: PullsRepository;
+  private _reposRepo?: RepoRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
+  private _sourceTree?: SourceTree;
+  private _codeParser?: CodeParser;
   private _priceBook?: PriceBook;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
@@ -98,6 +109,14 @@ export class Container {
 
   get reviewRepo(): ReviewRepository {
     return (this._reviewRepo ??= new ReviewRepository(this.db));
+  }
+
+  get pullsRepo(): PullsRepository {
+    return (this._pullsRepo ??= new PullsRepository(this.db));
+  }
+
+  get reposRepo(): RepoRepository {
+    return (this._reposRepo ??= new RepoRepository(this.db));
   }
 
   get codeIndex(): CodeIndex {
@@ -129,6 +148,20 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /** Read-only, root-confined access to cloned repos (repo-intel walk + reads). */
+  get sourceTree(): SourceTree {
+    if (this.overrides.sourceTree) return this.overrides.sourceTree;
+    this._sourceTree ??= new NodeSourceTree();
+    return this._sourceTree;
+  }
+
+  /** AST + fact extraction for TS/JS sources (repo-intel indexer + facade). */
+  get codeParser(): CodeParser {
+    if (this.overrides.codeParser) return this.overrides.codeParser;
+    this._codeParser ??= new AstGrepCodeParser();
+    return this._codeParser;
   }
 
   /**

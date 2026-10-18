@@ -14,7 +14,7 @@
  * facade keeps returning degraded — never throws.
  */
 import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-import type { Db } from '../../db/client.js';
+import type { Db, DbExecutor } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import { clampIndexedName } from '../../db/schema/context.js';
 import type { DegradedReason, FileRankRow, IndexState, IndexStatus } from './types.js';
@@ -242,47 +242,46 @@ export class RepoIntelRepository {
   // T2 indexer-pipeline writes.
   // -------------------------------------------------------------------------
 
-  /** Wipe every cached symbol + reference row for a repo (full-index reset). */
-  async deleteAllForRepo(repoId: string): Promise<void> {
-    await this.db.delete(t.symbols).where(eq(t.symbols.repoId, repoId));
-    await this.db.delete(t.references).where(eq(t.references.repoId, repoId));
-  }
-
   /**
-   * Wipe symbols whose `path` is in `paths` and references whose `fromPath`
-   * is in `paths`. Used by the incremental indexer before re-parsing a slice.
-   * Inline-empty guard keeps the no-op refresh path zero-DB.
+   * Replace the cached symbols + references atomically — for the whole repo
+   * (`paths: 'all'`, full index) or for the files in `paths` (incremental
+   * slice: symbols by `path`, references by `fromPath`). Readers never see a
+   * half-written index.
    */
-  async deleteForFiles(repoId: string, paths: string[]): Promise<void> {
-    if (paths.length === 0) return;
-    await this.db
-      .delete(t.symbols)
-      .where(and(eq(t.symbols.repoId, repoId), inArray(t.symbols.path, paths)));
-    await this.db
-      .delete(t.references)
-      .where(
-        and(eq(t.references.repoId, repoId), inArray(t.references.fromPath, paths)),
-      );
+  async rewriteSymbols(
+    repoId: string,
+    paths: 'all' | string[],
+    symbols: IndexerSymbolRow[],
+    references: IndexerReferenceRow[],
+  ): Promise<void> {
+    if (paths !== 'all' && paths.length === 0 && symbols.length === 0 && references.length === 0) {
+      return;
+    }
+    await this.db.transaction(async (tx) => {
+      if (paths === 'all') {
+        await tx.delete(t.symbols).where(eq(t.symbols.repoId, repoId));
+        await tx.delete(t.references).where(eq(t.references.repoId, repoId));
+      } else if (paths.length > 0) {
+        await tx
+          .delete(t.symbols)
+          .where(and(eq(t.symbols.repoId, repoId), inArray(t.symbols.path, paths)));
+        await tx
+          .delete(t.references)
+          .where(and(eq(t.references.repoId, repoId), inArray(t.references.fromPath, paths)));
+      }
+      await insertSymbolRows(tx, symbols);
+      await insertReferenceRows(tx, references);
+    });
   }
 
   /** Batched insert into `symbols`. Uses the same chunk size as blast. */
   async insertSymbols(rows: IndexerSymbolRow[]): Promise<void> {
-    if (rows.length === 0) return;
-    // Clamp the indexed `name` so a pathological multi-KB identifier can't blow
-    // the btree row-size limit and crash the indexer (see clampIndexedName).
-    const safe = rows.map((r) => ({ ...r, name: clampIndexedName(r.name) }));
-    for (let i = 0; i < safe.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.symbols).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    await insertSymbolRows(this.db, rows);
   }
 
   /** Batched insert into `references`. */
   async insertReferences(rows: IndexerReferenceRow[]): Promise<void> {
-    if (rows.length === 0) return;
-    const safe = rows.map((r) => ({ ...r, toSymbol: clampIndexedName(r.toSymbol) }));
-    for (let i = 0; i < safe.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.references).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    await insertReferenceRows(this.db, rows);
   }
 
   /**
@@ -349,38 +348,32 @@ export class RepoIntelRepository {
 
   /** Replace the whole import-graph for a repo (full index / incremental). */
   async replaceEdges(repoId: string, edges: IndexerEdgeRow[]): Promise<void> {
-    await this.db.delete(t.fileEdges).where(eq(t.fileEdges.repoId, repoId));
-    if (edges.length === 0) return;
     const rows = edges.map((e) => ({ repoId, fromFile: e.fromFile, toFile: e.toFile }));
-    for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.fileEdges).values(rows.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.fileEdges).where(eq(t.fileEdges.repoId, repoId));
+      for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
+        await tx.insert(t.fileEdges).values(rows.slice(i, i + INSERT_CHUNK_SIZE));
+      }
+    });
   }
 
   /** Replace the whole file_rank table for a repo. */
   async replaceFileRank(repoId: string, rows: IndexerFileRankRow[]): Promise<void> {
-    await this.db.delete(t.fileRank).where(eq(t.fileRank.repoId, repoId));
-    if (rows.length === 0) return;
     const values = rows.map((r) => ({ repoId, ...r }));
-    for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.fileRank).values(values.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.fileRank).where(eq(t.fileRank.repoId, repoId));
+      for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
+        await tx.insert(t.fileRank).values(values.slice(i, i + INSERT_CHUNK_SIZE));
+      }
+    });
   }
 
   /** Replace per-file facts; only rows with at least one endpoint/cron persist. */
   async replaceFileFacts(repoId: string, rows: IndexerFileFactsRow[]): Promise<void> {
-    await this.db.delete(t.fileFacts).where(eq(t.fileFacts.repoId, repoId));
-    const nonEmpty = rows.filter((r) => r.endpoints.length > 0 || r.crons.length > 0);
-    if (nonEmpty.length === 0) return;
-    const values = nonEmpty.map((r) => ({
-      repoId,
-      filePath: r.filePath,
-      endpoints: r.endpoints,
-      crons: r.crons,
-    }));
-    for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.fileFacts).values(values.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.fileFacts).where(eq(t.fileFacts.repoId, repoId));
+      await insertFileFactRows(tx, repoId, rows);
+    });
   }
 
   /**
@@ -598,21 +591,43 @@ export class RepoIntelRepository {
     files: string[],
     rows: IndexerFileFactsRow[],
   ): Promise<void> {
-    if (files.length > 0) {
-      await this.db
-        .delete(t.fileFacts)
-        .where(and(eq(t.fileFacts.repoId, repoId), inArray(t.fileFacts.filePath, files)));
-    }
-    const nonEmpty = rows.filter((r) => r.endpoints.length > 0 || r.crons.length > 0);
-    if (nonEmpty.length === 0) return;
-    const values = nonEmpty.map((r) => ({
-      repoId,
-      filePath: r.filePath,
-      endpoints: r.endpoints,
-      crons: r.crons,
-    }));
-    for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.fileFacts).values(values.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    await this.db.transaction(async (tx) => {
+      if (files.length > 0) {
+        await tx
+          .delete(t.fileFacts)
+          .where(and(eq(t.fileFacts.repoId, repoId), inArray(t.fileFacts.filePath, files)));
+      }
+      await insertFileFactRows(tx, repoId, rows);
+    });
+  }
+}
+
+async function insertSymbolRows(db: DbExecutor, rows: IndexerSymbolRow[]): Promise<void> {
+  // Clamp the indexed `name` so a pathological multi-KB identifier can't blow
+  // the btree row-size limit and crash the indexer (see clampIndexedName).
+  const safe = rows.map((r) => ({ ...r, name: clampIndexedName(r.name) }));
+  for (let i = 0; i < safe.length; i += INSERT_CHUNK_SIZE) {
+    await db.insert(t.symbols).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
+  }
+}
+
+async function insertReferenceRows(db: DbExecutor, rows: IndexerReferenceRow[]): Promise<void> {
+  const safe = rows.map((r) => ({ ...r, toSymbol: clampIndexedName(r.toSymbol) }));
+  for (let i = 0; i < safe.length; i += INSERT_CHUNK_SIZE) {
+    await db.insert(t.references).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
+  }
+}
+
+/** Only rows with at least one endpoint/cron persist. */
+async function insertFileFactRows(
+  db: DbExecutor,
+  repoId: string,
+  rows: IndexerFileFactsRow[],
+): Promise<void> {
+  const values = rows
+    .filter((r) => r.endpoints.length > 0 || r.crons.length > 0)
+    .map((r) => ({ repoId, filePath: r.filePath, endpoints: r.endpoints, crons: r.crons }));
+  for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
+    await db.insert(t.fileFacts).values(values.slice(i, i + INSERT_CHUNK_SIZE));
   }
 }

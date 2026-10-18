@@ -157,10 +157,12 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
       return;
     }
     app.log.error(err);
+    // Framework 4xx (rate limit, bad JSON, body too large) keep their message;
+    // anything else is a 500 whose message may carry internals (SQL, paths).
     const e = err as { statusCode?: number; message?: string };
-    reply.status(e.statusCode ?? 500).send({
-      error: { code: 'internal_error', message: e.message ?? 'Internal error' },
-    });
+    const status = e.statusCode !== undefined && e.statusCode >= 400 && e.statusCode < 500 ? e.statusCode : 500;
+    const message = status < 500 ? (e.message ?? 'Bad request') : 'Internal error';
+    reply.status(status).send({ error: { code: 'internal_error', message } });
   });
 
   // Register feature modules from the static registry (src/modules/index.ts).

@@ -7,8 +7,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { SeverityBadge } from "@devdigest/ui";
 import type { Severity } from "@devdigest/shared";
-import { SEVERITY_LEVELS } from "./constants";
-import type { SeverityCounts } from "./helpers";
+import { SEVERITY_LEVELS, type SeverityCounts } from "../../../_lib/severity";
 import { s } from "./styles";
 
 export function SeverityFilter({

@@ -56,9 +56,9 @@ Walk the list top-down; the first match wins.
 
 ## Legacy baseline
 
-31 violations that predate this skill are listed in `server/.dependency-cruiser-known-violations.json`
-(routes in `pulls`, `settings`, `polling`, `workspace` query the DB; `reviews` service/run-executor import row
-types; the `repo-intel` pipeline uses `fs` and adapters directly; …). The policy:
+`server/.dependency-cruiser-known-violations.json` held 31 violations that predated this skill; all were
+fixed on 2026-10-18 and the baseline is now empty (`[]`). It stays as the escape hatch for a future rule
+that flags existing code. The policy:
 
 - **Add no new ones.** Never regenerate the baseline to make a new violation pass — fix the code.
 - **Don't refactor legacy unprompted.** When you touch such a file, mention the violation; fix it only when

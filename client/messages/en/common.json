@@ -6,7 +6,8 @@
     "close": "Close",
     "import": "Import",
     "export": "Export",
-    "run": "Run"
+    "run": "Run",
+    "dismiss": "Dismiss"
   },
   "states": {
     "loading": "Loading…",
@@ -17,5 +18,24 @@
     "title": "No repo selected",
     "body": "This repository isn't in your workspace — it may have been removed, or the link is stale. Add a repo or pick another from the switcher to get started.",
     "cta": "Add repository"
+  },
+  "home": {
+    "breadcrumb": "DevDigest",
+    "title": "Welcome to DevDigest",
+    "subtitle": "Local-first AI PR review",
+    "emptyTitle": "No repositories yet",
+    "emptyBody": "Add a repository to start reviewing pull requests. Set your API keys once in Settings → API Keys.",
+    "emptyCta": "Add repository",
+    "redirecting": "Taking you to your repository…",
+    "open": "Open {name}"
+  },
+  "routeError": {
+    "title": "This page crashed",
+    "body": "An unexpected error interrupted rendering. Try again — if it keeps happening, check the API logs."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "This address doesn't match any page in DevDigest. The link may be stale.",
+    "cta": "Go home"
   }
 }
