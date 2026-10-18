@@ -1,0 +1,71 @@
+import type { CSSProperties } from "react";
+import { EDITOR_HEIGHT, LINE_HEIGHT, PAD_LEFT, PAD_TOP, SCROLLBAR_ROOM } from "./constants";
+
+/** Co-located styles for MarkdownEditor. */
+export const s = {
+  wrap: {
+    border: "1px solid var(--border-strong)",
+    borderRadius: 8,
+    background: "var(--bg-elevated)",
+    overflow: "hidden",
+  } satisfies CSSProperties,
+  head: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 12px",
+    borderBottom: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+    fontSize: 12,
+  } satisfies CSSProperties,
+  fileName: { fontWeight: 600, color: "var(--text-primary)" } satisfies CSSProperties,
+  tokens: { marginLeft: "auto", color: "var(--text-muted)" } satisfies CSSProperties,
+  body: { display: "flex", height: EDITOR_HEIGHT } satisfies CSSProperties,
+  gutter: {
+    width: 44,
+    flexShrink: 0,
+    overflow: "hidden",
+    padding: "10px 8px 10px 0",
+    textAlign: "right",
+    fontSize: 12,
+    lineHeight: `${LINE_HEIGHT}px`,
+    color: "var(--text-muted)",
+    background: "var(--bg-surface)",
+    borderRight: "1px solid var(--border)",
+    userSelect: "none",
+  } satisfies CSSProperties,
+  /** Positioning context for the highlight layer and the textarea stacked on it. */
+  editor: { position: "relative", flex: 1, minWidth: 0 } satisfies CSSProperties,
+  /** Same box + font as the textarea, painted behind it; the textarea's text is transparent. */
+  highlight: {
+    position: "absolute",
+    inset: 0,
+    margin: 0,
+    overflow: "hidden",
+    pointerEvents: "none",
+    padding: `${PAD_TOP}px ${PAD_LEFT + SCROLLBAR_ROOM}px ${PAD_TOP + SCROLLBAR_ROOM}px ${PAD_LEFT}px`,
+    fontSize: 13,
+    lineHeight: `${LINE_HEIGHT}px`,
+    whiteSpace: "pre",
+    color: "var(--text-primary)",
+  } satisfies CSSProperties,
+  line: { display: "block" } satisfies CSSProperties,
+  heading: { color: "var(--accent-text)" } satisfies CSSProperties,
+  textarea: {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    resize: "none",
+    border: "none",
+    outline: "none",
+    padding: `${PAD_TOP}px ${PAD_LEFT}px`,
+    fontSize: 13,
+    lineHeight: `${LINE_HEIGHT}px`,
+    whiteSpace: "pre",
+    overflow: "auto",
+    background: "transparent",
+    color: "transparent",
+    caretColor: "var(--text-primary)",
+  } satisfies CSSProperties,
+} as const;

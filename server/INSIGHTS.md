@@ -11,6 +11,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 <!-- Dead ends, abandoned approaches, the agent's repeated wrong defaults — and why. Most skipped, most valuable. -->
 - 2026-10-12 — The Drizzle migration journal (`src/db/migrations/meta`) has needed manual repair before (commit 2006964) → always generate via `pnpm db:generate`, never add SQL files by hand.
 - 2026-10-17 — wiping review history via `DELETE /runs/:id` / `DELETE /reviews/:id` leaves the PR "Reviewed": the list status is derived from `pull_requests.last_reviewed_sha` (`src/modules/pulls/status.ts:40`), which neither delete clears (`src/modules/reviews/repository/run.repo.ts:78`, `review.repo.ts:83`) → to reset, in one transaction: `DELETE FROM reviews` (findings cascade), `DELETE FROM agent_runs WHERE pr_id IS NOT NULL` (traces cascade; `pr_id` is `set null`, not cascade), `UPDATE pull_requests SET last_reviewed_sha = NULL`; verified: 13 open PRs back to `needs_review`
+- 2026-10-19 — an IT test of the "LLM unavailable" path that simply left out `overrides.llm` made a REAL OpenRouter call from this machine's stored key (3 s, status came back `clean`) → to simulate an outage inject a provider whose `completeStructured` throws (`DownLLM` in `test/skills-routes.it.test.ts`); never rely on "no override" in a test
 
 ## Codebase Patterns
 <!-- Conventions and architecture decisions (with the reason) not stated in CLAUDE.md -->
@@ -30,6 +31,10 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 - 2026-10-18 — services reach repositories through container getters (`container.reposRepo`, `src/modules/repos/service.ts` `private get repo()`), not `new XRepository(container.db)`: then a unit test passes a plain fake container (`test/repos-service.test.ts`, `test/polling-workspace-service.test.ts`) instead of overwriting a private field as `test/repo-intel-resync.test.ts` must → expose new shared repositories as lazy getters in `platform/container.ts`
 - 2026-10-18 — `LocalSecretsProvider` (`src/adapters/secrets/local.ts`) treats only ENOENT as "no stored keys"; an unreadable / non-JSON / non-string-valued file still serves its string entries but `set()` throws `AppError` 409 `secrets_file_invalid`, which `SettingsService.testConnection` returns as `ok:false` + message → never "fix" this by writing `{}` over the file: the old code dropped every other stored key on the next save (`test/secrets-local.test.ts`)
 - 2026-10-18 — `PullsRepository` id lookups take `workspaceId` (`ownedPr` / `ownedPrIds` subquery for `pr_files`/`pr_commits`, `src/modules/pulls/repository.ts`); `replaceDetailSnapshot` is a no-op for a foreign PR; `persistRunOutcome` returns the domain `PersistedRun {reviewId, findingsCount}` (`reviews/types.ts`) instead of Drizzle rows → keep new shared-repository methods tenant-scoped and row-free
+- 2026-10-19 — a skill reaches the prompt only if `isPromptUsable(skill, link.enabled)` (`src/modules/_shared/skill-policy.ts`: skill.enabled AND agent_skills.enabled AND, for imported/community sources, a `clean` vetting whose `version` equals the skill's) → reviewer-core renders skills UNWRAPPED, so never pass an unvetted body, and wrapping it in `<untrusted>` is not an option because `INJECTION_GUARD` would make the model ignore it
+- 2026-10-19 — `modules/_shared` may not import a module (`no-cross-module-imports`), so `resolveFeatureModel` now lives in `modules/_shared/feature-models.ts` via the new `container.settingsRepo`; `modules/settings/feature-models.ts` only re-exports it (`test/settings-models.it.test.ts` unchanged) → new shared lookups go behind a Container getter, not a sibling-module import
+- 2026-10-19 — a module's `helpers.ts` that imports row types from `src/db/rows.ts` fails `only-repositories-touch-the-db` (arch:check) → take the row type from the module's own `./repository.js` (`modules/skills/helpers.ts`, `modules/agents/helpers.ts`)
+- 2026-10-19 — `seed()` links a seeded skill to its agent only when the skill or the agent was created in THAT run, so a re-seed never restores a link the user removed in the UI (`src/db/seed.ts`, pinned in `test/skills.it.test.ts`) → keep seed links insert-if-new, not upsert
 
 ## Tool & Library Notes
 <!-- Dependency/tool quirks, version-specific behaviour -->
@@ -42,11 +47,14 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 - 2026-10-18 — `src/adapters/depgraph/index.ts` used a literal NUL byte as a key separator, so `file` reported "data" and editor/agent Read tools refused it as binary → write control chars as escapes (`\u0000`), never raw bytes; find them with `python3 -c "…b'\x00' in open(p,'rb').read()"`
 - 2026-10-18 — in the Cursor agent sandbox `docker info` fails, so `dockerAvailable()` (`test/helpers/pg.ts:23`) returns false and every `*.it.test.ts` silently self-skips while `pnpm test` is still green → run `pnpm test` with sandbox disabled (full permissions) and confirm the IT files appear in the output (verified: 24 files / 151 tests with IT)
 - 2026-10-18 — follow-up to 2026-10-18 "`src/adapters/depgraph/index.ts` used a literal NUL byte": the same raw NUL separator was also in `src/modules/repo-intel/pipeline/repo-map.ts:64` (now `\u0000`) → scan the whole `src/` with the python check, not just the file you are editing
+- 2026-10-19 — Fastify answers 400 to a DELETE that carries `content-type: application/json` with an empty body (a raw `urllib`/curl `-H` call), while the client's `apiFetch` only sets the header when there is a body → when scripting the API, omit the header on body-less requests
+- 2026-10-19 — `test/architecture.test.ts` scans every `src/**` file for `process.env`, including prose in seed prompts/skill bodies → don't write that literal into seeded text (found while writing the Test Quality skills)
 
 ## Recurring Errors & Fixes
 <!-- Error message → root cause → fix -->
 - 2026-10-12 — Migrations are not applied on boot; "relation … does not exist" means they were skipped → `pnpm db:migrate`.
 - 2026-10-17 — evidence for 2026-10-12 "Migrations are not applied on boot": only `pnpm db:migrate` (`tsx src/db/migrate.ts`, `package.json:13`) applies them; `src/server.ts` never calls it → run it after `docker compose down -v`
+- 2026-10-19 — `pnpm db:migrate` can print an error-looking stack (`routine: 'transformCreateStmt'`) and still succeed → that is a Postgres notice; trust the final `✓ migrations applied` and check the column (`information_schema.columns`), not the noise
 
 ## Session Notes
 <!-- Wrap-up only: `- YYYY-MM-DD — <task>: <outcome / key learning>` -->
@@ -60,6 +68,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 - 2026-10-18 — Architecture plan, wave 2 (server): reviews/repos row types behind repositories, job kinds + code-index scope to `_shared`/`platform`, repo-intel ports + adapters, transactions (`persistRunOutcome`, `rewriteSymbols`, edges/rank/facts, `deleteAgentRun`), `agent_runs.status` CHECK; baseline 20 → 0 (`[]`); typecheck + 155 tests green with IT; live API responses matched the shared Zod contracts
 - 2026-10-18 — Architecture plan, wave 4 (server tests): `RepoService` uses `container.reposRepo`; unit tests for repos (add/dedupe/clone job/token/refresh/remove, best-effort enqueue), polling and workspace services (18 tests); arch:check clean, typecheck + 173 tests green with IT
 - 2026-10-18 — pr-self-review warnings fixed (server): secrets file never overwritten when malformed, pulls repository tenant-scoped, `persistRunOutcome` row-free; arch:check clean, typecheck + 178 tests green with IT
+- 2026-10-19 — L02 Skills (server): migration 0012, `modules/skills` (CRUD, versions, .md/.zip import that only lists archive files, rules+LLM vetting, enable blocked unless `clean`), agent links with per-agent `enabled`, prompt blocks + `skills_meta` tokens, Test Quality Reviewer + 4 seeded skills; typecheck, arch:check and 250 tests green with IT; live API check: clean zip enabled, zero-width skill → malicious → 409 `skill_blocked`
 
 ## Open Questions
 <!-- Unresolved or unverified — what to investigate and where -->

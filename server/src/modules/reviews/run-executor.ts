@@ -1,11 +1,11 @@
 import type { Container } from '../../platform/container.js';
-import type { Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import type { PromptSkillMeta, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import type { ReviewRepository } from './repository.js';
 import type { PersistedRun, ReviewAgent, ReviewPull, ReviewRepoRef } from './types.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { taskLine, selectPromptSkills, buildSkillPrompt, skillsLogLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
@@ -180,6 +180,12 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Skills: ordered blocks of the agent's linked skills that are enabled
+      // globally AND for this agent AND pass the vetting policy. Disabled ones
+      // never reach the prompt or the log. Best-effort — a load failure must
+      // not fail the review.
+      const { blocks: skillBlocks, meta: skillsMeta } = await this.resolveSkills(agent.id, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -201,6 +207,7 @@ export class ReviewRunExecutor {
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
         task,
+        ...(skillBlocks.length > 0 ? { skills: skillBlocks } : {}),
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
         checkCancelled: () => {
@@ -267,7 +274,10 @@ export class ReviewRunExecutor {
           findings: persisted.findingsCount,
           grounding,
         },
-        prompt_assembly: outcome.assembly,
+        prompt_assembly: {
+          ...outcome.assembly,
+          skills_meta: skillsMeta.length > 0 ? skillsMeta : null,
+        },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
           args: c.label,
@@ -309,6 +319,24 @@ export class ReviewRunExecutor {
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
+    }
+  }
+
+  /** Skill blocks + per-skill token meta for the agent's prompt; empty on none/failure. */
+  private async resolveSkills(
+    agentId: string,
+    runLog: RunLogger,
+  ): Promise<{ blocks: string[]; meta: PromptSkillMeta[] }> {
+    try {
+      const rows = await this.agents.promptSkillsForAgent(agentId);
+      const built = buildSkillPrompt(selectPromptSkills(rows), (text) =>
+        this.container.tokenizer.count(text),
+      );
+      if (built.meta.length > 0) runLog.info(skillsLogLine(built.meta));
+      return built;
+    } catch (err) {
+      runLog.info(`skills: could not load — continuing without (${(err as Error).message})`);
+      return { blocks: [], meta: [] };
     }
   }
 

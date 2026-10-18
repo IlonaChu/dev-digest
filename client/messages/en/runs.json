@@ -53,7 +53,9 @@
       "copy": "Copy",
       "fullscreen": "Open fullscreen",
       "search": "Search in this block…",
-      "noMatches": "No matches for “{q}”."
+      "noMatches": "No matches for “{q}”.",
+      "skillsMeta": "{count, plural, one {# skill} other {# skills}} · {tokens} tokens",
+      "skillChip": "{name} v{version} · {tokens}"
     },
     "tools": {
       "args": "args",

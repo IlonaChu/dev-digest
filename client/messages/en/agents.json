@@ -1,7 +1,7 @@
 {
   "card": {
     "noDescription": "No description",
-    "skillCount": "{count} skills",
+    "skillCount": "{count, plural, one {# skill} other {# skills}}",
     "delete": "Delete agent",
     "deleteConfirm": "Delete agent \"{name}\"? This cannot be undone."
   },
@@ -14,6 +14,7 @@
     "addAgent": "Add Agent",
     "createFromScratch": "Create from scratch",
     "loadError": "Could not load agents.",
+    "noMatch": "No agents match the search.",
     "emptyTitle": "No agents yet",
     "emptyBody": "An agent is a configured reviewer — a model, a prompt, and the skills it uses. Create one to start reviewing.",
     "emptyCta": "Create your first agent"
@@ -39,11 +40,9 @@
   "editor": {
     "loadErrorTitle": "Couldn’t load this agent",
     "loadErrorBody": "The agent could not be loaded.",
-    "agentFallback": "Agent",
     "listTitle": "Agents",
-    "add": "Add",
-    "createFromScratch": "Create from scratch",
     "disabled": "disabled",
+    "runReview": "Run Review",
     "runOnPr": "Run on a PR…",
     "tabs": {
       "config": "Config",
@@ -93,7 +92,7 @@
     "title": "Skills",
     "enabledCount": "{linked} of {total} enabled",
     "filterPlaceholder": "Filter skills…",
-    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach."
+    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Drag to reorder."
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."

@@ -25,7 +25,7 @@ flowchart LR
 | `diff` | `UnifiedDiff` | Already parsed. Hunks carry new-side line numbers (`newLineNumbers`, or `newStart`/`newLines`). |
 | `llm` | `LLMProvider` | The only side effect. Only `completeStructured` is called. |
 | `strategy` | `'auto' \| 'single-pass' \| 'map-reduce'` | Default `'auto'`. Map-reduce needs more than one file. `auto` also needs more than `mapThresholdLines` (default `DEFAULT_MAP_THRESHOLD_LINES = 400`) changed lines. |
-| `skills`, `memory` | `string[]` | Resolved bodies, not slugs. Rendered unwrapped. |
+| `skills`, `memory` | `string[]` | Resolved bodies, not slugs. Rendered unwrapped, so the caller must vet untrusted skills first (server: `L02-skills.md`). |
 | `specs`, `callers`, `repoMap`, `prDescription` | `string[]` / `string` | Untrusted. Wrapped. Empty or blank means the section is omitted. `prDescription` is cut to 4000 chars. |
 | `task` | `string` | Framing line at the top of the user message. |
 | `maxRetries` | `number` | Structured-output retry budget, default `DEFAULT_REVIEW_MAX_RETRIES = 2`. |

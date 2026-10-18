@@ -8,6 +8,7 @@ import type {
   Provider,
   ReviewStrategy,
 } from '@devdigest/shared';
+import { ValidationError } from '../../platform/errors.js';
 import { AgentsRepository } from './repository.js';
 import { toAgentDto, toAgentVersionDto } from './helpers.js';
 
@@ -32,6 +33,12 @@ export interface CreateAgentInput {
   strategy?: ReviewStrategy;
   ci_fail_on?: CiFailOn;
   repo_intel?: boolean;
+  enabled?: boolean;
+}
+
+/** One requested link; `enabled` omitted = keep the current switch (default on). */
+export interface SkillLinkRequest {
+  skill_id: string;
   enabled?: boolean;
 }
 
@@ -138,21 +145,34 @@ export class AgentsService {
   /** Linked skills for an agent as AgentSkillLink[] (ordered). */
   async skillLinks(agentId: string): Promise<AgentSkillLink[]> {
     const links = await this.repo.linkedSkills(agentId);
-    return links.map((l) => ({ agent_id: agentId, skill_id: l.skill.id, order: l.order }));
+    return links.map((l) => ({
+      agent_id: agentId,
+      skill_id: l.skill.id,
+      order: l.order,
+      enabled: l.enabled,
+    }));
   }
 
   /**
-   * Set / reorder the agent's linked skills. If `skillIds` is provided, replaces
-   * the whole set in that order. Returns the resulting ordered links.
+   * Set / reorder the agent's linked skills. `links` replaces the whole set in
+   * that order; a link without `enabled` keeps its current switch (new links
+   * start enabled). Every skill must belong to this workspace (422 otherwise).
    */
   async setSkills(
     workspaceId: string,
     agentId: string,
-    skillIds: string[],
+    links: SkillLinkRequest[],
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
-    await this.repo.setSkills(agentId, skillIds);
+    const ids = links.map((l) => l.skill_id);
+    if (new Set(ids).size !== ids.length) throw new ValidationError('Duplicate skill in links');
+    await this.assertSkillsInWorkspace(workspaceId, ids);
+    const current = new Map((await this.repo.linkedSkills(agentId)).map((l) => [l.skill.id, l.enabled]));
+    await this.repo.setSkills(
+      agentId,
+      links.map((l) => ({ skillId: l.skill_id, enabled: l.enabled ?? current.get(l.skill_id) ?? true })),
+    );
     return this.skillLinks(agentId);
   }
 
@@ -162,13 +182,23 @@ export class AgentsService {
     agentId: string,
     skillId: string,
     order?: number,
+    enabled?: boolean,
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
+    await this.assertSkillsInWorkspace(workspaceId, [skillId]);
     const existing = await this.repo.linkedSkills(agentId);
     const resolvedOrder = order ?? existing.length;
-    await this.repo.linkSkill(agentId, skillId, resolvedOrder);
+    await this.repo.linkSkill(agentId, skillId, resolvedOrder, enabled);
     return this.skillLinks(agentId);
+  }
+
+  private async assertSkillsInWorkspace(workspaceId: string, skillIds: string[]): Promise<void> {
+    const known = await this.repo.skillIdsInWorkspace(workspaceId, skillIds);
+    const missing = skillIds.filter((id) => !known.has(id));
+    if (missing.length > 0) {
+      throw new ValidationError('Unknown skill for this workspace', { skill_ids: missing });
+    }
   }
 
   /**

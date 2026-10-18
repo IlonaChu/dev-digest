@@ -47,6 +47,10 @@
       "conventions": {
         "label": "Conventions",
         "description": "Extracts coding conventions from the repo."
+      },
+      "skill_vetting": {
+        "label": "Skill vetting",
+        "description": "Checks an imported skill for prompt-injection before it can be enabled."
       }
     }
   },

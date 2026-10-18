@@ -20,7 +20,18 @@ const miniBtnStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-export function PromptBlock({ label, text, color }: { label: string; text: string; color: string }) {
+export function PromptBlock({
+  label,
+  text,
+  color,
+  chips,
+}: {
+  label: string;
+  text: string;
+  color: string;
+  /** Optional small tags under the header, e.g. one per skill with its token cost. */
+  chips?: string[];
+}) {
   const t = useTranslations("runs");
   const [open, setOpen] = React.useState(false);
   const [full, setFull] = React.useState(false);
@@ -65,6 +76,15 @@ export function PromptBlock({ label, text, color }: { label: string; text: strin
           </span>
         </span>
       </div>
+      {chips && chips.length > 0 && (
+        <div style={s.promptChips}>
+          {chips.map((c, i) => (
+            <span key={`${c}-${i}`} className="mono" style={s.promptChip}>
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
       {open && (
         <pre className="mono" style={s.promptPre}>
           {text || "—"}

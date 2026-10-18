@@ -29,6 +29,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 - 2026-10-17 — HW1 audit: no reviewer-core code changed; only docs/specs added and the evidence line above → nothing else worth recording
 - 2026-10-18 — Onion guard: `test/architecture.test.ts` (no deps, regex over `src/**` imports) pins core → only `zod`/`@devdigest/shared`/core, `src/llm/` → +`openai`, no Node built-ins/`process.env`; negative probe in `src/review/` failed 2 of 3 tests as expected, then removed; 26 tests green
 - 2026-10-18 — Architecture plan, wave 1 (reviewer-core): npm → pnpm (lockfile, CI, README), zod alias in vitest, no engine code changed
+- 2026-10-19 — L02 Skills: no engine change; `prompt.test.ts` now pins the `## Skills / rules` section (order, unwrapped, omitted when empty); docs state that callers must vet skills because the slot is unwrapped; 29 tests green
 
 ## Open Questions
 <!-- Unresolved or unverified — what to investigate and where -->

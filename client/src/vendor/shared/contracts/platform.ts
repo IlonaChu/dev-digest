@@ -18,6 +18,7 @@ export const FeatureModelId = z.enum([
   'risk_brief',
   'conformance',
   'conventions',
+  'skill_vetting',
 ]);
 export type FeatureModelId = z.infer<typeof FeatureModelId>;
 
@@ -76,6 +77,13 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     description: 'Extracts coding conventions from the repo.',
     defaultProvider: 'openai',
     defaultModel: 'gpt-5.4',
+  },
+  {
+    id: 'skill_vetting',
+    label: 'Skill vetting',
+    description: 'Checks an imported skill for prompt-injection before it can be enabled.',
+    defaultProvider: 'openrouter',
+    defaultModel: 'deepseek/deepseek-v4-flash',
   },
 ];
 

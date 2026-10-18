@@ -1,0 +1,192 @@
+/* hooks/skills.ts — React Query hooks for the Skills page, Skill Editor, import
+   flow and the agent editor's Skills tab. Skills are text only; the server owns
+   the vetting policy (409 `skill_blocked` when enabling a non-clean import). */
+import { queryOptions, useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
+import { AgentSkillLink, Skill, SkillImportPreview, SkillVersion } from "@devdigest/shared";
+import type { SkillType } from "@devdigest/shared";
+import { api } from "../api";
+
+export const skillKeys = {
+  all: ["skills"] as const,
+  detail: (id: string | null | undefined) => ["skill", id] as const,
+  versions: (id: string | null | undefined) => ["skill-versions", id] as const,
+  agentLinks: (agentId: string | null | undefined) => ["agent-skills", agentId] as const,
+};
+
+export const skillsQuery = () =>
+  queryOptions({
+    queryKey: skillKeys.all,
+    queryFn: () => api.get("/skills", z.array(Skill)),
+  });
+
+export const skillQuery = (id: string | null | undefined) =>
+  queryOptions({
+    queryKey: skillKeys.detail(id),
+    queryFn: () => api.get(`/skills/${id}`, Skill),
+    enabled: !!id,
+  });
+
+export const skillVersionsQuery = (id: string | null | undefined) =>
+  queryOptions({
+    queryKey: skillKeys.versions(id),
+    queryFn: () => api.get(`/skills/${id}/versions`, z.array(SkillVersion)),
+    enabled: !!id,
+  });
+
+export const agentSkillLinksQuery = (agentId: string | null | undefined) =>
+  queryOptions({
+    queryKey: skillKeys.agentLinks(agentId),
+    queryFn: () => api.get(`/agents/${agentId}/skills`, z.array(AgentSkillLink)),
+    enabled: !!agentId,
+  });
+
+export function useSkills() {
+  return useQuery(skillsQuery());
+}
+
+export function useSkill(id: string | null | undefined) {
+  return useQuery(skillQuery(id));
+}
+
+export function useSkillVersions(id: string | null | undefined) {
+  return useQuery(skillVersionsQuery(id));
+}
+
+export function useAgentSkillLinks(agentId: string | null | undefined) {
+  return useQuery(agentSkillLinksQuery(agentId));
+}
+
+/** Number of skills attached (and switched on) per agent id; undefined while a count loads.
+    Shares the `agentLinks` cache with the agent's Skills tab, so edits there update the cards. */
+export function useAgentSkillCounts(agentIds: string[]): Record<string, number | undefined> {
+  const results = useQueries({ queries: agentIds.map((id) => agentSkillLinksQuery(id)) });
+  return Object.fromEntries(agentIds.map((id, i) => [id, results[i]?.data?.filter((l) => l.enabled).length]));
+}
+
+export interface CreateSkillInput {
+  name: string;
+  description?: string;
+  type?: SkillType;
+  body: string;
+  enabled?: boolean;
+}
+
+export function useCreateSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateSkillInput) => api.post<Skill>("/skills", input),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: skillKeys.all });
+      qc.setQueryData(skillKeys.detail(data.id), data);
+    },
+  });
+}
+
+export interface UpdateSkillInput {
+  id: string;
+  patch: Partial<Pick<Skill, "name" | "description" | "type" | "body" | "enabled">> & {
+    version_message?: string;
+  };
+}
+
+export function useUpdateSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: UpdateSkillInput) => api.put<Skill>(`/skills/${id}`, patch),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: skillKeys.all });
+      qc.invalidateQueries({ queryKey: skillKeys.versions(data.id) });
+      qc.setQueryData(skillKeys.detail(data.id), data);
+    },
+  });
+}
+
+export function useDeleteSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<{ ok: boolean }>(`/skills/${id}`),
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: skillKeys.all });
+      qc.removeQueries({ queryKey: skillKeys.detail(id) });
+      qc.removeQueries({ queryKey: skillKeys.versions(id) });
+    },
+  });
+}
+
+export function useRestoreSkillVersion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) =>
+      api.post<Skill>(`/skills/${id}/versions/${version}/restore`),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: skillKeys.all });
+      qc.invalidateQueries({ queryKey: skillKeys.versions(data.id) });
+      qc.setQueryData(skillKeys.detail(data.id), data);
+    },
+  });
+}
+
+/** Re-run the safety check of an imported skill (e.g. after the LLM was down). */
+export function useRevetSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Skill>(`/skills/${id}/vet`),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: skillKeys.all });
+      qc.setQueryData(skillKeys.detail(data.id), data);
+    },
+  });
+}
+
+/** An uploaded file, already base64-encoded in the browser (api.ts sends JSON only). */
+export interface SkillFilePayload {
+  filename: string;
+  content_base64: string;
+}
+
+/** Step 1 of import: parse + vet, persist NOTHING. Validated against the shared contract. */
+export function useImportSkillPreview() {
+  return useMutation({
+    mutationFn: async (file: SkillFilePayload) =>
+      SkillImportPreview.parse(await api.post<unknown>("/skills/import/preview", file)),
+  });
+}
+
+export interface ImportSkillInput extends SkillFilePayload {
+  name?: string;
+  description?: string;
+  type?: SkillType;
+}
+
+/** Step 2 of import, after the user confirmed the preview. Saved DISABLED. */
+export function useImportSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ImportSkillInput) => api.post<Skill>("/skills/import", input),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: skillKeys.all });
+      qc.setQueryData(skillKeys.detail(data.id), data);
+    },
+  });
+}
+
+/** One entry of the ordered set an agent has attached. */
+export interface AgentSkillLinkInput {
+  skill_id: string;
+  enabled: boolean;
+}
+
+/** Replace the agent's skills with this ordered set (order = array index). */
+export function useSetAgentSkills() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, links }: { agentId: string; links: AgentSkillLinkInput[] }) =>
+      api.post<AgentSkillLink[]>(`/agents/${agentId}/skills`, { links }),
+    onSuccess: (data, { agentId }) => {
+      qc.setQueryData(skillKeys.agentLinks(agentId), data);
+      // agent_count on the skill cards changed
+      qc.invalidateQueries({ queryKey: skillKeys.all });
+    },
+  });
+}

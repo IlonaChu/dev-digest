@@ -35,7 +35,7 @@ flowchart TD
    - System message = agent system prompt + `INJECTION_GUARD` (a module-private constant, appended on every call, so every consumer gets it).
    - The user message holds sections in this order, each omitted when empty: task, `## PR description`, `## Skills / rules`, `## Relevant memory`, `## Repo skeleton`, `## Project context`, `## Callers of changed symbols`, `## Diff to review` (always present).
    - `wrapUntrusted(label, content)` fences content as `<untrusted source="label">…</untrusted>` and rewrites any `</untrusted>` inside the content to `<\/untrusted>`, so content cannot close its own fence. Wrapped: PR description (label `pr-description`), repo map (`repo-map`), specs (`spec-<i>`), callers (`callers`), diff (`diff`).
-   - Not wrapped: `skills` and `memory` (treated as trusted or pre-sanitised by the caller) and `task`.
+   - Not wrapped: `skills` and `memory` (treated as trusted or pre-sanitised by the caller) and `task`. The studio server only passes skills that are enabled and, when imported, vetted `clean` (`server/specs/L02-skills.md`); wrapping them would make `INJECTION_GUARD` tell the model to ignore them.
    - PR description is capped at `MAX_PR_DESCRIPTION_CHARS = 4000` before wrapping.
    - `assembly` (a `PromptAssembly`) is the run-trace record. Single-pass keeps the real call's assembly; map-reduce keeps a whole-diff assembly computed up front.
 3. **Cancellation** — `checkCancelled?.()` runs before each chunk's LLM call. The engine only calls it; the caller supplies a function that throws.

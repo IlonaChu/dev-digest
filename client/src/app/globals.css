@@ -22,3 +22,10 @@
     transform: translateY(0);
   }
 }
+
+/* Skill body editor: its text is transparent (a mirror layer paints it), so the
+   placeholder needs an explicit colour — Firefox derives it from the text colour. */
+.dd-body-input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}

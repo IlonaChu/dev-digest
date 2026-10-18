@@ -6,6 +6,8 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
+  TEST_QUALITY_SKILLS,
 } from './seed-prompts.js';
 
 /** Default provider/model for the built-in reviewer agents. */
@@ -18,8 +20,9 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the three built-in agents (General + Security +
- * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
+ * with a few findings, and the four built-in agents (General + Security +
+ * Performance + Test Quality), all on the default openrouter/deepseek-v4-flash
+ * provider+model, plus the Test Quality Reviewer's four skills linked in order.
  *
  * Course lessons populate the other tables (skills, conventions, memory, eval,
  * …) once their features are built — they start empty here.
@@ -211,13 +214,79 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description: 'Checks test quality: uncovered branches, missed corner cases, over-mocking, flakiness.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
+  const createdAgentNames = new Set<string>();
   for (const a of seedAgents) {
     const [existing] = await db
       .select()
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
-    if (!existing) await db.insert(t.agents).values(a);
+    if (!existing) {
+      await db.insert(t.agents).values(a);
+      createdAgentNames.add(a.name);
+    }
+  }
+
+  // ---- Test Quality Reviewer's skills (own text → source 'manual', no vetting) ----
+  // A skill is created once (v1 + its snapshot). It is linked to the agent, in
+  // list order, only when the skill or the agent is new in this run — so a link
+  // the user removed in the UI is not silently restored by a re-seed.
+  const [tqAgent] = await db
+    .select()
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'Test Quality Reviewer')));
+  for (const [order, sk] of TEST_QUALITY_SKILLS.entries()) {
+    let [skill] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, sk.name)));
+    let createdSkill = false;
+    if (!skill) {
+      [skill] = await db
+        .insert(t.skills)
+        .values({
+          workspaceId,
+          name: sk.name,
+          description: sk.description,
+          type: sk.type,
+          source: 'manual',
+          body: sk.body,
+          enabled: true,
+          version: 1,
+        })
+        .onConflictDoNothing()
+        .returning();
+      createdSkill = !!skill;
+      if (skill) {
+        await db
+          .insert(t.skillVersions)
+          .values({ skillId: skill.id, version: 1, body: sk.body, description: sk.description })
+          .onConflictDoNothing();
+      } else {
+        // lost a race with a concurrent seed — read the winner
+        [skill] = await db
+          .select()
+          .from(t.skills)
+          .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, sk.name)));
+      }
+    }
+    if (tqAgent && skill && (createdSkill || createdAgentNames.has('Test Quality Reviewer'))) {
+      await db
+        .insert(t.agentSkills)
+        .values({ agentId: tqAgent.id, skillId: skill.id, order })
+        .onConflictDoNothing();
+    }
   }
 
   return { workspaceId, userId };

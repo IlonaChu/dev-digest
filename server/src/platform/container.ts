@@ -27,6 +27,10 @@ import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import { PullsRepository } from '../modules/pulls/repository.js';
 import { RepoRepository } from '../modules/repos/repository.js';
+import { SkillsRepository } from '../modules/skills/repository.js';
+import { SettingsRepository } from '../modules/settings/repository.js';
+import type { ArchiveReader } from '../modules/skills/ports.js';
+import { FflateArchiveReader } from '../adapters/archive/fflate.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import type { CodeParser, SourceTree, Tokenizer } from '../modules/repo-intel/ports.js';
@@ -58,6 +62,8 @@ export interface ContainerOverrides {
   tokenizer?: Tokenizer;
   sourceTree?: SourceTree;
   codeParser?: CodeParser;
+  /** Zip reader for skill import — tests inject a fake. */
+  archive?: ArchiveReader;
 }
 
 export class Container {
@@ -81,6 +87,9 @@ export class Container {
   private _reviewRepo?: ReviewRepository;
   private _pullsRepo?: PullsRepository;
   private _reposRepo?: RepoRepository;
+  private _skillsRepo?: SkillsRepository;
+  private _settingsRepo?: SettingsRepository;
+  private _archive?: ArchiveReader;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -117,6 +126,21 @@ export class Container {
 
   get reposRepo(): RepoRepository {
     return (this._reposRepo ??= new RepoRepository(this.db));
+  }
+
+  get skillsRepo(): SkillsRepository {
+    return (this._skillsRepo ??= new SkillsRepository(this.db));
+  }
+
+  get settingsRepo(): SettingsRepository {
+    return (this._settingsRepo ??= new SettingsRepository(this.db));
+  }
+
+  /** Read-only zip access for skill import (lists entries, reads one text file). */
+  get archive(): ArchiveReader {
+    if (this.overrides.archive) return this.overrides.archive;
+    this._archive ??= new FflateArchiveReader();
+    return this._archive;
   }
 
   get codeIndex(): CodeIndex {

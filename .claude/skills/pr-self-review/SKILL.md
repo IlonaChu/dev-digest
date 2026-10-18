@@ -2,6 +2,7 @@
 name: pr-self-review
 description: "Local pre-PR gate for DevDigest: reviews ALL open changes of the branch (commits since merge-base with origin/main + staged + unstaged + untracked) by routing each changed file to the matching project skills — UI skills on client/ files, backend architecture skills on server/ and reviewer-core/ files — plus typecheck, arch:check and repo-rule checks. Any CRITICAL finding blocks `git push` and `gh pr create`. Use before pushing or opening a pull request, when the pr-self-review gate blocks a push, or when the user says 'self review', 'review my changes', 'ready for PR?', 'check before push'."
 argument-hint: "[--base <ref>] [--tests]"
+disable-model-invocation: true
 ---
 
 # PR Self-Review
