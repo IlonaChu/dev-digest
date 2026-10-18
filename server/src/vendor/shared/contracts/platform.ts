@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Provider } from './knowledge.js';
+import { Severity, FindingCategory } from './findings.js';
 
 /**
  * Platform / scaffolding DTOs owned by F1:
@@ -154,6 +155,32 @@ export type Repo = z.infer<typeof Repo>;
 export const PrStatus = z.enum(['needs_review', 'reviewed', 'stale', 'open', 'closed', 'merged']);
 export type PrStatus = z.infer<typeof PrStatus>;
 
+/** Read-only preview of one finding of a review run (PR list / timeline popover). */
+export const PrFindingPreview = z.object({
+  id: z.string(),
+  severity: Severity,
+  category: FindingCategory,
+  title: z.string(),
+  file: z.string(),
+  start_line: z.number().int(),
+  end_line: z.number().int(),
+  confidence: z.number(),
+  rationale: z.string(),
+});
+export type PrFindingPreview = z.infer<typeof PrFindingPreview>;
+
+/** Latest review of ONE agent on a PR (one section of the PR list findings popover). */
+export const PrAgentFindings = z.object({
+  // null = review without an agent (seed / legacy rows).
+  agent_id: z.string().nullable(),
+  // null = no agent, or the agent was deleted → UI shows "Unknown agent".
+  agent_name: z.string().nullable(),
+  run_id: z.string().nullable(),
+  score: z.number().int().nullable(),
+  findings: z.array(PrFindingPreview),
+});
+export type PrAgentFindings = z.infer<typeof PrAgentFindings>;
+
 export const PrMeta = z.object({
   id: z.string().nullish(),
   number: z.number().int(),
@@ -168,8 +195,12 @@ export const PrMeta = z.object({
   status: PrStatus,
   opened_at: z.string().nullish(),
   updated_at: z.string().nullish(),
-  // Latest-review score (list endpoint only; null/absent until reviewed).
+  // Rounded average of each agent's latest review score (list endpoint only; null/absent until reviewed).
   score: z.number().int().nullish(),
+  // USD cost summed over every successful run of the PR (list endpoint only; null = no run / unknown).
+  cost_usd: z.number().nullish(),
+  // Latest review of each agent with its findings (list endpoint only; absent/empty until reviewed).
+  findings_by_agent: z.array(PrAgentFindings).nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

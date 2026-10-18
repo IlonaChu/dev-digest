@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
@@ -51,5 +51,30 @@ describe("FindingsPanel (smoke)", () => {
   it("shows the empty state when nothing matches", () => {
     renderWithIntl(<FindingsPanel findings={[]} prId="pr1" />);
     expect(screen.getByText("No findings match")).toBeInTheDocument();
+  });
+
+  describe("severity filter", () => {
+    const MIXED: FindingRecord[] = [
+      ...FINDINGS,
+      { ...FINDINGS[0]!, id: "f2", severity: "WARNING", title: "N+1 query" },
+    ];
+
+    it("counts match the cards listed in the run", () => {
+      renderWithIntl(<FindingsPanel findings={MIXED} prId="pr1" />);
+      const pills = screen.getByTestId("severity-counts");
+      expect(pills).toHaveTextContent("1 Critical");
+      expect(pills).toHaveTextContent("1 Warning");
+    });
+
+    it("lists only findings of the clicked severity and restores the list on a second click", () => {
+      renderWithIntl(<FindingsPanel findings={MIXED} prId="pr1" />);
+      const warning = screen.getByRole("button", { name: /warning/i });
+      fireEvent.click(warning);
+      expect(screen.getByText("N+1 query")).toBeInTheDocument();
+      expect(screen.queryByText("Hardcoded secret")).not.toBeInTheDocument();
+      fireEvent.click(warning);
+      expect(screen.getByText("N+1 query")).toBeInTheDocument();
+      expect(screen.getByText("Hardcoded secret")).toBeInTheDocument();
+    });
   });
 });

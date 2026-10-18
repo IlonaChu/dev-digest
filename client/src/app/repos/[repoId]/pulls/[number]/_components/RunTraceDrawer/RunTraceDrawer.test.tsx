@@ -1,13 +1,14 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { RunTrace } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/runs.json"; // apps/web/messages/en/runs.json
 
 // Mock the trace hooks so the drawer renders without a query client / SSE.
+let currentTrace: RunTrace;
 const TRACE: RunTrace = {
   config: { agent: "Security", version: "1", provider: "openai", model: "gpt-4.1", pr: 482, source: "local" },
-  stats: { duration_ms: 8200, tokens_in: 12000, tokens_out: 1500, findings: 2, grounding: "2/2 passed" },
+  stats: { duration_ms: 8200, tokens_in: 12000, tokens_out: 1500, cost_usd: 0.06, findings: 2, grounding: "2/2 passed" },
   prompt_assembly: { system: "You are a reviewer.", skills: "### skill", memory: null, specs: null, user: "Review PR #482" },
   tool_calls: [{ tool: "review_file", args: "src/config.ts", meta: "single-pass", ms: 1200 }],
   raw_output: '{"verdict":"request_changes"}',
@@ -20,7 +21,7 @@ const TRACE: RunTrace = {
 };
 
 vi.mock("../../../../../../../lib/hooks/trace", () => ({
-  useRunTrace: () => ({ data: TRACE, isLoading: false }),
+  useRunTrace: () => ({ data: currentTrace, isLoading: false }),
 }));
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
   useRunEvents: () => ({ events: [], running: false }),
@@ -28,6 +29,9 @@ vi.mock("../../../../../../../lib/hooks/reviews", () => ({
 
 import RunTraceDrawer from "./RunTraceDrawer";
 
+beforeEach(() => {
+  currentTrace = TRACE;
+});
 afterEach(cleanup);
 
 function renderWithIntl(ui: React.ReactElement) {
@@ -52,5 +56,20 @@ describe("A5 Run Trace drawer (smoke)", () => {
     fireEvent.click(screen.getByText("log"));
     // LiveLogStream renders its filter input
     expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
+  });
+
+  it("shows the COST stat tile", () => {
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    expect(screen.getByText("COST")).toBeInTheDocument();
+    expect(screen.getByText("$0.060")).toBeInTheDocument();
+  });
+
+  it("a trace persisted before cost tracking shows an em dash in the COST tile", () => {
+    const { cost_usd: _omit, ...legacyStats } = TRACE.stats;
+    currentTrace = { ...TRACE, stats: legacyStats };
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    expect(screen.getByText("COST")).toBeInTheDocument();
+    expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
+    expect(screen.getByText("—", { selector: ".tnum" })).toBeInTheDocument();
   });
 });

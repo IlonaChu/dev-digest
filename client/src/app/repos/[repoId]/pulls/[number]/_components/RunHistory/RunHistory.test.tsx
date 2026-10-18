@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { RunSummary } from "@devdigest/shared";
+import type { RunSummary, PrFindingPreview } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { RunHistory } from "./RunHistory";
 
@@ -25,6 +25,7 @@ function run(o: Partial<RunSummary>): RunSummary {
     duration_ms: 1000,
     tokens_in: 100,
     tokens_out: 50,
+    cost_usd: null,
     findings_count: 0,
     grounding: "0/0 passed",
     ran_at: "2026-06-11T18:44:34.000Z",
@@ -34,10 +35,24 @@ function run(o: Partial<RunSummary>): RunSummary {
   };
 }
 
-function renderRuns(runs: RunSummary[]) {
+function finding(id: string, severity: PrFindingPreview["severity"]): PrFindingPreview {
+  return {
+    id,
+    severity,
+    category: "security",
+    title: `Finding ${id}`,
+    file: "src/a.ts",
+    start_line: 1,
+    end_line: 1,
+    confidence: 0.9,
+    rationale: "Because.",
+  };
+}
+
+function renderRuns(runs: RunSummary[], findingsByRun?: Record<string, PrFindingPreview[]>) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      <RunHistory runs={runs} onOpenTrace={() => {}} />
+      <RunHistory runs={runs} findingsByRun={findingsByRun} onOpenTrace={() => {}} />
     </NextIntlClientProvider>,
   );
 }
@@ -71,5 +86,42 @@ describe("RunHistory — outcome badge", () => {
   it("a running run reads 'running'", () => {
     renderRuns([run({ status: "running", score: null, blockers: null })]);
     expect(screen.getByText("running")).toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — run cost", () => {
+  it("a done run shows tokens (in+out) and cost", () => {
+    renderRuns([run({ status: "done", tokens_in: 9000, tokens_out: 119, cost_usd: 0.0013 })]);
+    expect(screen.getByText("9 119 tok · $0.0013")).toBeInTheDocument();
+  });
+
+  it("a done run with unknown cost shows an em dash, never $0.00", () => {
+    renderRuns([run({ status: "done", cost_usd: null })]);
+    expect(screen.getByText("150 tok · —")).toBeInTheDocument();
+    expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
+  });
+
+  it("a failed run shows no cost line", () => {
+    renderRuns([run({ status: "failed", error: "429 quota", cost_usd: null })]);
+    expect(screen.queryByText(/tok/)).not.toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — severity icons", () => {
+  const FINDINGS = [finding("f1", "CRITICAL"), finding("f2", "CRITICAL"), finding("f3", "WARNING")];
+
+  it("a done run with loaded findings shows per-severity counts instead of the count text", () => {
+    renderRuns([run({ status: "done", findings_count: 3, blockers: 2, score: 38 })], { "run-1": FINDINGS });
+    const counts = screen.getByLabelText("3 findings in this run");
+    expect(counts).toHaveTextContent("2");
+    expect(counts).toHaveTextContent("1");
+    expect(screen.getByText(/2 blockers/)).toBeInTheDocument();
+    expect(screen.queryByText(/finding\(s\)/)).not.toBeInTheDocument();
+  });
+
+  it("a done run without loaded findings keeps the count text", () => {
+    renderRuns([run({ status: "done", findings_count: 3, blockers: 0, score: 72 })], { other: FINDINGS });
+    expect(screen.getByText("3 finding(s)")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/in this run/)).not.toBeInTheDocument();
   });
 });

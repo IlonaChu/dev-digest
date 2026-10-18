@@ -5,6 +5,8 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
+import { RunCostBadge } from "@/components/RunCostBadge";
+import { FindingsPopover } from "../FindingsPopover";
 import type { PrMeta } from "@/lib/types";
 import { SIZE_COLOR, STATUS_META } from "../../constants";
 import { relativeTime, sizeOf } from "../../helpers";
@@ -54,9 +56,15 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         )}
       </div>
       <div>
+        <FindingsPopover groups={pr.findings_by_agent} />
+      </div>
+      <div>
         <Badge dot color={st.c} bg="transparent">
           {t(`list.status.${st.labelKey}`)}
         </Badge>
+      </div>
+      <div>
+        <RunCostBadge variant="compact" costUsd={pr.cost_usd} />
       </div>
       <div style={s.updatedCell}>{relativeTime(pr.updated_at)}</div>
     </div>
