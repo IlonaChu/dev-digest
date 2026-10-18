@@ -32,4 +32,4 @@ pnpm test         # vitest + jsdom + React Testing Library; fetch is mocked
 - [specs/pages.md](specs/pages.md) — changing any page's behaviour
 - [specs/L01-run-cost-badge.md](specs/L01-run-cost-badge.md) — touching cost display
 - [README.md](README.md) (route map) · [docs/](docs/README.md) · [specs/](specs/README.md) · [INSIGHTS.md](INSIGHTS.md)
-Skills: next-best-practices · react-best-practices · react-testing-library
+Skills: frontend-architecture (where code goes) · next-best-practices · react-best-practices · react-testing-library

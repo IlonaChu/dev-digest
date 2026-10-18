@@ -114,6 +114,19 @@ repository.ts  the only layer that touches Drizzle for that domain
 - Not every route follows the full stack. `modules/pulls/routes.ts` queries
   `container.db` directly (list/detail, GitHub sync, rollups) and has no service or
   repository file. Treat it as the exception, not a template for new modules.
+  The same holds for the `settings`, `polling` and `workspace` routes.
+
+### Enforcement
+
+The layering is checked by dependency-cruiser (`.dependency-cruiser.cjs`, run by
+`pnpm arch:check` and by `test/architecture.test.ts` inside `pnpm test`): only
+`repository*` files import Drizzle/`src/db`, modules never import `src/adapters/*`
+or another module, SDKs and `fs` stay in adapters, adapters and `platform/*` (except
+the container) never import modules, and `src/vendor/shared` stays dependency-free.
+The 31 violations that predate the check are listed in
+`.dependency-cruiser-known-violations.json`; the check fails only on new ones. Rules,
+rationale and the baseline policy: the `onion-architecture` skill
+(`.claude/skills/onion-architecture/`).
 
 ## Errors
 

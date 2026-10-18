@@ -10,6 +10,7 @@ pnpm test                                             # all (integration needs D
 pnpm exec vitest run --exclude '**/*.it.test.ts'      # unit only, hermetic
 pnpm exec vitest run .it.test                         # integration only (testcontainers)
 pnpm db:generate && pnpm db:migrate                   # after editing src/db/schema/*
+pnpm arch:check                                       # layer rules (also run by pnpm test)
 ```
 
 ## Where things live
@@ -26,6 +27,9 @@ pnpm db:generate && pnpm db:migrate                   # after editing src/db/sch
 - Throw `AppError` / `NotFoundError` / … from `platform/errors.ts`; the error handler builds the response.
 - Only `*.it.test.ts` may touch a real DB; every other test must stay hermetic (no network, no keys).
 - Review logic belongs in `reviewer-core`; the server only resolves context, persists and streams.
+- Onion layering is enforced: only `repository*` touches Drizzle, modules use ports via the `Container`,
+  SDKs live in `adapters/` (`.dependency-cruiser.cjs`, `test/architecture.test.ts`). Legacy violations sit in
+  `.dependency-cruiser-known-violations.json` — never regenerate it to pass a new one.
 
 ## Gotchas
 - Migrations are NOT applied on boot — run `pnpm db:migrate`.
@@ -37,4 +41,4 @@ pnpm db:generate && pnpm db:migrate                   # after editing src/db/sch
 - [specs/review-flow.md](specs/review-flow.md) — touching reviews, `run-executor`, run status, SSE or the pulls routes
 - [specs/L01-run-cost-badge.md](specs/L01-run-cost-badge.md) — touching cost (`cost_usd`) or the PR list rollup
 - [README.md](README.md) (API map, env) · [INSIGHTS.md](INSIGHTS.md) · [docs/](docs/README.md) · [specs/](specs/README.md)
-Skills: fastify-best-practices · drizzle-orm-patterns · postgresql-table-design
+Skills: onion-architecture · fastify-best-practices · drizzle-orm-patterns · postgresql-table-design

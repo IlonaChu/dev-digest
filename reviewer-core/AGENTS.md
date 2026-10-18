@@ -19,6 +19,8 @@ Consumers (server, CI runner) import the TypeScript source directly via a path a
 ## Rules
 - PURE: no DB, filesystem, GitHub or env access. The only side effect is the INJECTED `LLMProvider`.
   Anything needing I/O is resolved by the caller and passed in as strings.
+  Enforced by `test/architecture.test.ts`: core files import only `zod`, `@devdigest/shared` and each other;
+  `src/llm/` (the adapter ring) may add `openai`; core never imports `src/llm/`.
 - All external content (diff, PR body, repo map, specs) must go through `wrapUntrusted`.
 - Never weaken the grounding gate or `INJECTION_GUARD` to make a test pass.
 - The final score comes from findings that survived grounding, not from the model.
@@ -32,4 +34,4 @@ Consumers (server, CI runner) import the TypeScript source directly via a path a
 - [specs/review-contract.md](specs/review-contract.md) — changing inputs/outputs, grounding, or scoring
 - [README.md](README.md) · [INSIGHTS.md](INSIGHTS.md) · [docs/](docs/README.md) · [specs/](specs/README.md)
 
-Skills: zod · typescript-expert · security
+Skills: onion-architecture · zod · typescript-expert · security

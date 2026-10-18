@@ -1,6 +1,6 @@
 ---
 name: react-best-practices
-description: "Modern React best practices and anti-pattern catalog (2025-26). Use when writing, reviewing, or refactoring React components, hooks, and state management. Covers component design, state patterns, hooks misuse, performance, data fetching, and code organization."
+description: "Modern React best practices and anti-pattern catalog (2025-26). Use when writing, reviewing, or refactoring React components, hooks, and state management. Covers component design, state patterns, hooks misuse, performance, and data fetching. For where files, components, helpers, constants and state go, use frontend-architecture."
 ---
 
 # React Best Practices & Anti-Patterns
@@ -166,9 +166,8 @@ New arrays, objects, and functions created inline in JSX props break `React.memo
 
 ## Code Organization (MEDIUM)
 
-### Feature-Based Structure
-- Colocate component + hook + helpers + tests per feature
-- Shared utilities go in `utils/` or `components/ui/`
+Folder structure, component splitting, and where business logic, constants, helpers/utils, types and state go
+are covered by the [frontend-architecture](../frontend-architecture/SKILL.md) skill.
 
 ### File Quality
 - Order: imports, constants, helpers, component, exports
