@@ -61,8 +61,9 @@ or tab breaks the matching flow.
 Recent UI features with no flow (flows 02/04 only check the PR title, `request changes`, `2 findings` and
 the seeded finding title):
 
-- **PR list FINDINGS column** - `FindingsPopover` (severity icons with counts; hover/focus opens the
-  "N FINDINGS IN THIS RUN" preview). Flow 02 clicks the row but never asserts the column or popover.
+- **PR list FINDINGS column** - `FindingsPopover` (severity icons summed over the latest run of each agent;
+  hover/focus opens the "N FINDINGS · M AGENTS" preview with one section per agent). Flow 02 clicks the row
+  but never asserts the column or popover. Seed review `#482` has no agent, so it shows as "Unknown agent".
 - **Per-run severity counters / filter** - `SeverityFilter` pills in each run's `FindingsPanel` in the Agent
   runs tab (local per-run filter). Flow 04 does not click a pill or assert counts.
 - **COST column** - `RunCostBadge` (compact) in `PRRow`, header key `list.columns.cost`. Not asserted; the

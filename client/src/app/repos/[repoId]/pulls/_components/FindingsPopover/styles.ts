@@ -54,6 +54,21 @@ export const s = {
     textTransform: "uppercase",
     color: "var(--text-muted)",
   } satisfies CSSProperties,
+  // Per-agent section header (PR list): agent name · count, on a recessed band.
+  sectionHead: {
+    padding: "7px 14px",
+    borderBottom: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "var(--text-secondary)",
+  } satisfies CSSProperties,
+  sectionEmpty: {
+    padding: "8px 14px",
+    borderBottom: "1px solid var(--border)",
+    fontSize: 12,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
   item: {
     padding: "10px 14px",
     borderBottom: "1px solid var(--border)",

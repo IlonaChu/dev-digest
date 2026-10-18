@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type {
   PrMeta,
   PrDetail,
+  PrAgentFindings,
   PrFindingPreview,
   GitHubClient,
   PrReviewComment,
@@ -13,7 +14,7 @@ import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { deriveReviewStatus } from './status.js';
+import { averageScore, deriveReviewStatus, latestReviewPerAgent } from './status.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -117,28 +118,33 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest-review SCORE + FINDINGS per PR for the list's score ring and findings popover,
-    // and the summed COST of every successful run. Computed on read (no FK denorm); the
-    // list is small, so a few IN-queries + JS grouping are cheap (no N+1, no LLM call).
+    // Per PR, the latest review of EACH agent → the list's FINDINGS popover (one section per
+    // agent) and the SCORE ring (their rounded average); plus the summed COST of every
+    // successful run. Computed on read (no FK denorm); the list is small, so a few IN-queries
+    // + JS grouping are cheap (no N+1, no LLM call).
     const prIds = rows.map((r) => r.id);
-    const latestReviewByPr = new Map<
+    const agentReviewsByPr = new Map<
       string,
-      { score: number | null; findings: PrFindingPreview[] }
+      { score: number | null; findingsByAgent: PrAgentFindings[] }
     >();
     const costByPr = new Map<string, number>();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ id: t.reviews.id, prId: t.reviews.prId, score: t.reviews.score })
+        .select({
+          id: t.reviews.id,
+          prId: t.reviews.prId,
+          agentId: t.reviews.agentId,
+          agentName: t.agents.name,
+          runId: t.reviews.runId,
+          score: t.reviews.score,
+        })
         .from(t.reviews)
+        .leftJoin(t.agents, eq(t.agents.id, t.reviews.agentId))
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
-      // Rows are newest-first → first seen per PR is the latest review.
-      const latest = new Map<string, { id: string; score: number | null }>();
-      for (const rv of reviewRows) {
-        if (!latest.has(rv.prId)) latest.set(rv.prId, { id: rv.id, score: rv.score });
-      }
+      const latestByPr = latestReviewPerAgent(reviewRows);
 
-      const reviewIds = [...latest.values()].map((l) => l.id);
+      const reviewIds = [...latestByPr.values()].flatMap((list) => list.map((l) => l.id));
       const findingsByReview = new Map<string, PrFindingPreview[]>();
       if (reviewIds.length > 0) {
         const findingRows = await container.db
@@ -161,8 +167,17 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
           findingsByReview.set(f.reviewId, list);
         }
       }
-      for (const [prId, l] of latest) {
-        latestReviewByPr.set(prId, { score: l.score, findings: findingsByReview.get(l.id) ?? [] });
+      for (const [prId, list] of latestByPr) {
+        agentReviewsByPr.set(prId, {
+          score: averageScore(list),
+          findingsByAgent: list.map((l) => ({
+            agent_id: l.agentId,
+            agent_name: l.agentName,
+            run_id: l.runId,
+            score: l.score,
+            findings: findingsByReview.get(l.id) ?? [],
+          })),
+        });
       }
 
       // COST = SUM over every successful ('done') run of the PR. SUM ignores NULL costs, and a
@@ -179,7 +194,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
 
     const now = Date.now();
     return rows.map((r) => {
-      const review = latestReviewByPr.get(r.id);
+      const review = agentReviewsByPr.get(r.id);
       return {
         id: r.id,
         number: r.number,
@@ -202,7 +217,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         cost_usd: costByPr.get(r.id) ?? null,
-        findings: review ? review.findings : [],
+        findings_by_agent: review ? review.findingsByAgent : [],
       };
     });
   });

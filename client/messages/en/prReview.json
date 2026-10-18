@@ -113,6 +113,11 @@
     "findings": {
       "ariaLabel": "{count, plural, one {# finding} other {# findings}} in the latest run",
       "popoverTitle": "{count, plural, one {# FINDING} other {# FINDINGS}} IN THIS RUN",
+      "agentsAriaLabel": "{count, plural, one {# finding} other {# findings}} in the latest run of each agent",
+      "popoverTitleAgents": "{count, plural, one {# FINDING} other {# FINDINGS}} · {agents, plural, one {# AGENT} other {# AGENTS}}",
+      "section": "{agent} · {count}",
+      "unknownAgent": "Unknown agent",
+      "noFindings": "No findings",
       "confidence": "{value} confidence"
     }
   },

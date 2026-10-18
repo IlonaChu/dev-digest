@@ -70,3 +70,22 @@ review (newest `reviews` row with `kind = 'review'`), read with one `IN` query o
 - `score` still comes from that same latest review. Computing score, findings and cost costs three queries
   per list call (reviews, findings, grouped cost), none per PR, no LLM call.
 - Pinned by `test/reviews.it.test.ts` (`listed.findings` has the one grounded CRITICAL on `src/config.ts:11`).
+
+## Update 2026-10-18
+Supersedes the `findings` / `score` wording of "Update 2026-10-17" (cost is unchanged: still the SUM over done runs).
+
+**Findings and score count the latest review of EACH agent, not the single newest review of the PR.**
+Review feedback: after *Review all* the list showed only the last agent's findings, so the numbers hid the other agents.
+- `PrMeta.findings` is replaced by `findings_by_agent: PrAgentFindings[]` (`nullish`, list endpoint only):
+  `{ agent_id, agent_name, run_id, score, findings: PrFindingPreview[] }`, one entry per agent. Contract in
+  `src/vendor/shared/contracts/platform.ts`, mirrored to the client.
+- Grouping (`latestReviewPerAgent` in `src/modules/pulls/status.ts`): reviews are read newest-first with
+  `leftJoin(agents)`; the first row per `(pr_id, agent_id)` wins, so a re-run of one agent replaces its findings and
+  never adds to them. Reviews with `agent_id = null` (seed/legacy) form one group. Groups are sorted by agent name;
+  `agent_name = null` (no agent or a deleted one) goes last and the UI labels it "Unknown agent".
+- `score` = rounded average of the groups' non-null scores (`averageScore`); `null` when no group has one.
+- Still three queries per list call (reviews+agents, findings by `review_id IN (...)`, grouped cost), no N+1, no LLM call.
+- Pinned by `test/pulls-status.test.ts` (grouping, ordering, average) and `test/reviews.it.test.ts`
+  (same agent re-run → still 1 group / 1 finding; a second agent → groups `Perf`, `Sec`; score = average).
+- Known data caveat: a review whose `agent_runs` row was removed outside `deleteAgentRun` still counts (it is
+  still listed in the PR's Review runs), even though the Timeline no longer shows that run.

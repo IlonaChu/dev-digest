@@ -3,8 +3,8 @@ import type { PrStatus } from '@devdigest/shared';
 /**
  * PR-list rollup helpers (pure — no DB / `this`, so they unit-test cleanly).
  *
- * The Pull Requests list shows, per PR: the latest review's SCORE, a FINDINGS
- * severity breakdown, and a review STATUS. The DB `status` column holds
+ * The Pull Requests list shows, per PR: the average SCORE and the FINDINGS of
+ * each agent's latest review, and a review STATUS. The DB `status` column holds
  * GitHub's merge state (open/merged/closed); the review status
  * (needs_review / reviewed / stale) is DERIVED here for OPEN PRs from the
  * commit a review last ran against (`lastReviewedSha`) vs the PR head, plus age.
@@ -28,6 +28,50 @@ export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
     else if (r.severity === 'SUGGESTION') c.suggestion += 1;
   }
   return c;
+}
+
+/** One `kind='review'` row as the PR-list query reads it (joined with the agent name). */
+export interface ListReviewRow {
+  id: string;
+  prId: string;
+  agentId: string | null;
+  agentName: string | null;
+  runId: string | null;
+  score: number | null;
+}
+
+/**
+ * Latest review of EACH agent, grouped per PR. `rows` must be newest-first: the first row
+ * seen for a (PR, agent) pair wins, so re-runs of one agent never add up. Reviews without an
+ * agent share one group. Groups are sorted by agent name, unnamed (no / deleted agent) last.
+ */
+export function latestReviewPerAgent<R extends ListReviewRow>(rows: readonly R[]): Map<string, R[]> {
+  const seen = new Set<string>();
+  const byPr = new Map<string, R[]>();
+  for (const r of rows) {
+    const key = `${r.prId}:${r.agentId ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const list = byPr.get(r.prId) ?? [];
+    list.push(r);
+    byPr.set(r.prId, list);
+  }
+  for (const list of byPr.values()) list.sort(byAgentName);
+  return byPr;
+}
+
+function byAgentName(a: { agentName: string | null }, b: { agentName: string | null }): number {
+  if (a.agentName === b.agentName) return 0;
+  if (a.agentName == null) return 1;
+  if (b.agentName == null) return -1;
+  return a.agentName.localeCompare(b.agentName);
+}
+
+/** Rounded mean of the non-null scores; null when no review has a score. */
+export function averageScore(reviews: readonly { score: number | null }[]): number | null {
+  const scores = reviews.flatMap((r) => (r.score == null ? [] : [r.score]));
+  if (scores.length === 0) return null;
+  return Math.round(scores.reduce((sum, v) => sum + v, 0) / scores.length);
 }
 
 /**

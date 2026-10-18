@@ -56,7 +56,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         )}
       </div>
       <div>
-        <FindingsPopover findings={pr.findings} />
+        <FindingsPopover groups={pr.findings_by_agent} />
       </div>
       <div>
         <Badge dot color={st.c} bg="transparent">

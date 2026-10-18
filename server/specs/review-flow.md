@@ -173,9 +173,10 @@ Each must stay true; the pinning test is listed where one exists.
     with `waitForPrRuns` (`test/helpers/runs.ts`), never with sleeps.
 
 ## Related read: PR list rollup
-`GET /repos/:id/pulls` (`modules/pulls/routes.ts`) derives `score` from the latest
-`kind='review'` review, `findings` from that review, and `cost_usd` as the sum over the
-PR's `done` runs. See [L01-run-cost-badge.md](L01-run-cost-badge.md#update-2026-10-17).
+`GET /repos/:id/pulls` (`modules/pulls/routes.ts`) takes the latest `kind='review'` review
+of EACH agent: `findings_by_agent` lists them with their findings, `score` is the rounded
+average of their scores, and `cost_usd` is the sum over the PR's `done` runs. See
+[L01-run-cost-badge.md](L01-run-cost-badge.md#update-2026-10-18).
 
 ## Acceptance criteria
 1. `POST /pulls/:id/review` returns within one request with one `run_id` per target agent and

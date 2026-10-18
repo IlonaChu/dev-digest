@@ -1,5 +1,10 @@
-import type { PrFindingPreview } from "@devdigest/shared";
+import type { PrAgentFindings, PrFindingPreview } from "@devdigest/shared";
 import { POPOVER_GAP, POPOVER_WIDTH, VIEWPORT_MARGIN } from "./constants";
+
+/** Every finding of every agent section, in section order — the cell's counts and aria-label. */
+export function flattenGroups(groups: readonly Pick<PrAgentFindings, "findings">[]): PrFindingPreview[] {
+  return groups.flatMap((g) => g.findings);
+}
 
 const SEVERITY_RANK: Record<PrFindingPreview["severity"], number> = {
   CRITICAL: 0,

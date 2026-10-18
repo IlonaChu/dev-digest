@@ -18,6 +18,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 - 2026-10-17 — PR list `cost_usd` = SUM of `agent_runs.cost_usd` where `status='done'` grouped by `pr_id` (`src/modules/pulls/routes.ts:171`); SUM skips NULLs and a PR with no done/priced run stays `null`, never 0 → keep that rule if the query changes (pinned by `test/reviews.it.test.ts` two-run assertion)
 - 2026-10-17 — PR list items also carry `findings: PrFindingPreview[]` of the latest review (`routes.ts`, contract in `src/vendor/shared/contracts/platform.ts`), read by the client popover; `platform.ts` is identical in both vendored copies → edit both together
 - 2026-10-17 — evidence for 2026-10-12 "The Drizzle migration journal": the journal is `src/db/migrations/meta/_journal.json`; latest generated migration is `0010_known_squadron_supreme.sql` (via `pnpm db:generate`, `package.json:13` is `db:migrate`)
+- 2026-10-18 — supersedes 2026-10-17 "PR list items also carry `findings`": the list now returns `findings_by_agent` = latest review per `(pr_id, agent_id)` (newest-first, first row wins) and `score` = rounded average of those → keep the grouping in the pure `latestReviewPerAgent`/`averageScore` (`src/modules/pulls/status.ts`, unit-tested in `test/pulls-status.test.ts`), not inline in `routes.ts`; a same-agent re-run must replace, never add
 
 ## Tool & Library Notes
 <!-- Dependency/tool quirks, version-specific behaviour -->
@@ -36,8 +37,10 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 - 2026-10-17 — HW1 audit fixes (server): PR list cost summed over done runs + latest-run findings preview (`src/modules/pulls/routes.ts:128-205`); IT test extended with a second run; typecheck + 130 tests green
 - 2026-10-17 — evidence for the earlier Run Cost Badge note: commit 8563219 (`src/modules/reviews/run-executor.ts:213` persists `costUsd`, migration 0010)
 - 2026-10-17 — Local review-history wipe (DB only, no code): deleted 41 reviews (+31 findings), 41 runs (+traces), reset 11 `last_reviewed_sha`; 56 PRs kept, API shows no score/findings/cost left; data-only backup taken first
+- 2026-10-18 — PR-list FINDINGS per agent (review feedback): `PrMeta.findings` → `findings_by_agent`, score = average of agents' latest reviews, cost unchanged; IT test covers same-agent re-run + second agent; typecheck + 136 tests green (IT ran); live check PR #1: General(41) + Security(65) → score 53
 
 ## Open Questions
 <!-- Unresolved or unverified — what to investigate and where -->
 - 2026-10-17 — `agent_runs` has no `batch_id`, so *Review all* runs can't be grouped and the PR list cost is one run (latest review's `run_id`), not the batch total → add a `batch_id` column if a batch sum is ever required (`modules/pulls/routes.ts`, unverified product need)
 - 2026-10-17 — supersedes 2026-10-17 "`agent_runs` has no `batch_id`": the PR-list cost now sums every done run by `agent_runs.pr_id` (`routes.ts:171`), so a batch_id is not needed for that column → only add it if per-batch grouping is wanted in the UI
+- 2026-10-18 — verified: local DB has 2 `kind='review'` rows whose `run_id` no longer exists in `agent_runs` (PR #1 of IlonaChu/dev-digest), so the list's General Reviewer score (41, from the orphan review) differs from the Timeline's latest run (18); cause unknown — `deleteAgentRun` deletes review + run together (`src/modules/reviews/repository/run.repo.ts:78`), so likely manual SQL → before debugging a list-vs-Timeline mismatch run `select count(*) from reviews r where kind='review' and run_id is not null and not exists (select 1 from agent_runs a where a.id=r.run_id)`; decide whether the list should skip such reviews

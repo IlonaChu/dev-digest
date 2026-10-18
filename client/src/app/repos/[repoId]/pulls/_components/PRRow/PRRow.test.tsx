@@ -26,7 +26,7 @@ function pr(o: Partial<PrMeta>): PrMeta {
     updated_at: null,
     score: 61,
     cost_usd: 0.014,
-    findings: [],
+    findings_by_agent: [],
     ...o,
   };
 }
@@ -53,20 +53,41 @@ describe("PRRow — COST cell", () => {
 });
 
 describe("PRRow — FINDINGS cell", () => {
-  it("shows severity counts for the latest run and a dash when there are none", () => {
-    const f = (id: string, severity: "CRITICAL" | "WARNING") => ({
-      id,
-      severity,
-      category: "bug" as const,
-      title: id,
-      file: "a.ts",
-      start_line: 1,
-      end_line: 1,
-      confidence: 0.9,
-      rationale: "r",
-    });
-    renderRow(pr({ findings: [f("x", "CRITICAL"), f("y", "CRITICAL"), f("z", "WARNING")] }));
-    expect(screen.getByLabelText("3 findings in the latest run")).toHaveTextContent("2");
+  const f = (id: string, severity: "CRITICAL" | "WARNING") => ({
+    id,
+    severity,
+    category: "bug" as const,
+    title: id,
+    file: "a.ts",
+    start_line: 1,
+    end_line: 1,
+    confidence: 0.9,
+    rationale: "r",
+  });
+  const agent = (id: string, findings: ReturnType<typeof f>[]) => ({
+    agent_id: id,
+    agent_name: id,
+    run_id: `run-${id}`,
+    score: 65,
+    findings,
+  });
+
+  it("sums the latest run of each agent into the severity counts", () => {
+    renderRow(
+      pr({
+        findings_by_agent: [
+          agent("Sec", [f("x", "CRITICAL"), f("z", "WARNING")]),
+          agent("Perf", [f("y", "CRITICAL")]),
+        ],
+      }),
+    );
+    expect(screen.getByLabelText("3 findings in the latest run of each agent")).toHaveTextContent("21");
+  });
+
+  it("shows a dash when no agent has findings", () => {
+    renderRow(pr({ findings_by_agent: [agent("Sec", [])] }));
+    expect(screen.queryByLabelText(/findings in the latest run/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 });
 

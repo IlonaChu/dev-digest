@@ -56,18 +56,23 @@ review", counted over all PRs, not the filtered list.
 
 **Columns** (`COLUMN_KEYS`, grid `GRID` in `constants.ts`, header and rows share it): Pull request, Author,
 Size (S < 100, M < 400, else L changed lines), Score, **Findings**, Status, **Cost**, Updated.
-- Score: `CircularScore`, or "—" when `PrMeta.score` is null (never reviewed).
-- **Findings** renders `FindingsPopover` with `PrMeta.findings` (the findings of the **latest** review run).
-  No findings (null/empty) renders "—". Otherwise one compact `SeverityBadge` per level that exists (CRITICAL,
-  WARNING, SUGGESTION) with its count. Hovering or focusing the cell opens a read-only popover titled
-  "N FINDINGS IN THIS RUN"; each entry is text only: severity badge, title, category, `file:start-end`,
-  "NN% confidence", rationale; sorted most severe first, then most confident. No buttons, no accept/reject,
-  clicks inside do not navigate. Position is fixed (below the trigger in the upper half of the viewport,
-  above it in the lower half, clamped to the viewport) because the table card clips overflow.
-  Counts are a client-side group-by (`countBySeverity`), no LLM call.
+- Score: `CircularScore` of `PrMeta.score` = rounded average of each agent's latest review score
+  (server-side), or "—" when null (never reviewed).
+- **Findings** renders `FindingsPopover groups={PrMeta.findings_by_agent}`: the **latest run of each agent**,
+  one `PrAgentFindings` per agent (a re-run of the same agent replaces its findings, it does not add up).
+  No findings across all agents (null/empty) renders "—". Otherwise one severity icon per level that exists
+  (CRITICAL, WARNING, SUGGESTION) with its count summed over all agents. Hovering or focusing the cell opens a
+  read-only popover titled "N FINDINGS · M AGENTS", then one section per agent headed "<agent> · N" (agent
+  name, or "Unknown agent" when null; an agent whose latest run found nothing shows "No findings"); each entry
+  is text only: severity badge, title, category, `file:start-end`, "NN% confidence", rationale; sorted most
+  severe first, then most confident, within its section. No buttons, no accept/reject, clicks inside do not
+  navigate. Position is fixed (below the trigger in the upper half of the viewport, above it in the lower half,
+  clamped to the viewport) because the table card clips overflow. Counts are a client-side group-by
+  (`countBySeverity` over `flattenGroups`), no LLM call. The Timeline reuses the same component with the flat
+  `findings` of one run ("N FINDINGS IN THIS RUN").
 - **Cost** renders `RunCostBadge compact` with `PrMeta.cost_usd`: the sum over every successful (`done`)
-  run of the PR (server-side, `server/src/modules/pulls/routes.ts`), so it covers all runs while Findings covers
-  only the latest. `null` renders "—".
+  run of the PR (server-side, `server/src/modules/pulls/routes.ts`), so it covers all runs including older
+  re-runs, while Findings covers only each agent's latest. `null` renders "—".
 - A row click goes to `/repos/:repoId/pulls/:number`.
 
 **States:** loading = 4 skeleton rows; error = `ErrorState` (`ApiError.message`, retry); empty = `EmptyState`
@@ -76,8 +81,9 @@ an error.
 
 **Invariants:**
 - Cost "—" (unknown) is never shown as "$0.00"; `$0.00` only for a real zero.
-- The popover contains no interactive controls; its count equals the number of previews in the payload and
-  the severity icons' counts add up to it.
+- The popover contains no interactive controls; its count equals the number of previews over all agent
+  sections in the payload, the severity icons' counts add up to it, and each section header equals the
+  entries listed under it.
 - Findings and Cost come from the list payload only; the row triggers no extra request.
 - Header and rows use the same `GRID`; adding a column means changing `COLUMN_KEYS`, `GRID`, the
   `list.columns.*` message and `PRRow` together.

@@ -222,18 +222,48 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     const list = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
     const listed = list.find((p: { number: number }) => p.number === 482);
     expect(listed.cost_usd).toBeCloseTo(calls * 0.001, 6);
-    // PR list also carries the latest run's findings for the hover popover.
-    expect(listed.findings).toHaveLength(1);
-    expect(listed.findings[0]).toMatchObject({ severity: 'CRITICAL', file: 'src/config.ts', start_line: 11 });
+    // PR list also carries each agent's latest-run findings for the hover popover.
+    expect(listed.findings_by_agent).toHaveLength(1);
+    expect(listed.findings_by_agent[0]).toMatchObject({ agent_id: agent.id, agent_name: 'Sec', run_id: runId, score: 65 });
+    expect(listed.findings_by_agent[0].findings).toHaveLength(1);
+    expect(listed.findings_by_agent[0].findings[0]).toMatchObject({
+      severity: 'CRITICAL',
+      file: 'src/config.ts',
+      start_line: 11,
+    });
 
-    // A second successful run ADDS to the PR's cost (sum over all done runs, not just the latest).
+    // A second successful run ADDS to the PR's cost (sum over all done runs, not just the latest)...
     await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
     await waitForPrRuns(pg.handle.db, pr.id, { expected: 2 });
     const summed = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
-    expect(summed.find((p: { number: number }) => p.number === 482).cost_usd).toBeCloseTo(
-      calls * 0.001 * 2,
-      6,
-    );
+    const summedPr = summed.find((p: { number: number }) => p.number === 482);
+    expect(summedPr.cost_usd).toBeCloseTo(calls * 0.001 * 2, 6);
+    // ...but a re-run of the SAME agent replaces its findings, it never adds them up.
+    expect(summedPr.findings_by_agent).toHaveLength(1);
+    expect(summedPr.findings_by_agent[0].findings).toHaveLength(1);
+    expect(summedPr.findings_by_agent[0].run_id).not.toBe(runId);
+
+    // A DIFFERENT agent gets its own section: the list counts the latest run of each agent.
+    const perf = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Perf', provider: 'openai', model: 'gpt-4.1', system_prompt: 'perf' },
+      })
+    ).json();
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: perf.id } });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 3 });
+    const multi = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` }))
+      .json()
+      .find((p: { number: number }) => p.number === 482);
+    expect(
+      multi.findings_by_agent.map((g: { agent_name: string; findings: unknown[] }) => [g.agent_name, g.findings.length]),
+    ).toEqual([
+      ['Perf', 1],
+      ['Sec', 1],
+    ]);
+    // Score = rounded average of each agent's latest score (both 65 here).
+    expect(multi.score).toBe(65);
 
     await app.close();
   });
