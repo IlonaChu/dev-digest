@@ -33,9 +33,21 @@ const toDate = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
 /**
  * Pull requests, their file/commit snapshots and the PR-list rollup reads.
  * Exposed as `container.pullsRepo` so the polling module can reuse the sync.
+ * Lookups by PR/repo id take the workspace too: callers outside this module must
+ * not be able to reach another tenant's rows with a bare id. The rollup reads
+ * take ids that already came from a scoped `listForRepo`.
  */
 export class PullsRepository {
   constructor(private db: Db) {}
+
+  private ownedPr(workspaceId: string, prId: string) {
+    return and(eq(t.pullRequests.workspaceId, workspaceId), eq(t.pullRequests.id, prId));
+  }
+
+  /** Subquery yielding `prId` only when it belongs to the workspace — scopes the child tables. */
+  private ownedPrIds(workspaceId: string, prId: string) {
+    return this.db.select({ id: t.pullRequests.id }).from(t.pullRequests).where(this.ownedPr(workspaceId, prId));
+  }
 
   async findPullWithRepo(
     workspaceId: string,
@@ -90,13 +102,16 @@ export class PullsRepository {
     return unique.length;
   }
 
-  async listForRepo(repoId: string): Promise<PullRecord[]> {
-    const rows = await this.db.select().from(t.pullRequests).where(eq(t.pullRequests.repoId, repoId));
+  async listForRepo(workspaceId: string, repoId: string): Promise<PullRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(t.pullRequests)
+      .where(and(eq(t.pullRequests.workspaceId, workspaceId), eq(t.pullRequests.repoId, repoId)));
     return rows.map(toPullRecord);
   }
 
-  async updateDiffStats(prId: string, stats: DiffStats): Promise<void> {
-    await this.db.update(t.pullRequests).set(stats).where(eq(t.pullRequests.id, prId));
+  async updateDiffStats(workspaceId: string, prId: string, stats: DiffStats): Promise<void> {
+    await this.db.update(t.pullRequests).set(stats).where(this.ownedPr(workspaceId, prId));
   }
 
   /** Every `kind='review'` review of the PRs (with agent name), newest first. */
@@ -155,9 +170,11 @@ export class PullsRepository {
     return costByPr;
   }
 
-  /** Replace the files/commits snapshot and refresh body + diff stats atomically. */
-  async replaceDetailSnapshot(prId: string, detail: PrDetail): Promise<void> {
+  /** Replace the files/commits snapshot and refresh body + diff stats atomically. No-op for a foreign PR. */
+  async replaceDetailSnapshot(workspaceId: string, prId: string, detail: PrDetail): Promise<void> {
     await this.db.transaction(async (tx) => {
+      const [owned] = await tx.select({ id: t.pullRequests.id }).from(t.pullRequests).where(this.ownedPr(workspaceId, prId));
+      if (!owned) return;
       await tx.delete(t.prFiles).where(eq(t.prFiles.prId, prId));
       if (detail.files.length > 0) {
         await tx.insert(t.prFiles).values(
@@ -190,14 +207,14 @@ export class PullsRepository {
           deletions: detail.deletions,
           filesCount: detail.files_count,
         })
-        .where(eq(t.pullRequests.id, prId));
+        .where(this.ownedPr(workspaceId, prId));
     });
   }
 
-  async persistedDetail(prId: string): Promise<PersistedDetail> {
+  async persistedDetail(workspaceId: string, prId: string): Promise<PersistedDetail> {
     const [files, commits] = await Promise.all([
-      this.db.select().from(t.prFiles).where(eq(t.prFiles.prId, prId)),
-      this.db.select().from(t.prCommits).where(eq(t.prCommits.prId, prId)),
+      this.db.select().from(t.prFiles).where(inArray(t.prFiles.prId, this.ownedPrIds(workspaceId, prId))),
+      this.db.select().from(t.prCommits).where(inArray(t.prCommits.prId, this.ownedPrIds(workspaceId, prId))),
     ]);
     return {
       files: files.map((f) => ({ path: f.path, additions: f.additions, deletions: f.deletions, patch: f.patch ?? null })),

@@ -4,8 +4,6 @@
      GET  /repos/:id/index-state  → RepoIntelState
      POST /repos/:id/resync       → fetch latest from origin + incremental
                                      reindex (202). NOT a destructive re-clone. */
-"use client";
-
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
 

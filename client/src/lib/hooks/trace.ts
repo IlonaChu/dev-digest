@@ -3,8 +3,6 @@
    tool_calls[] + raw_output + memory_pulled[] + full log). Registered by A2;
    A5 enriches the document it returns. Live events stream via useRunEvents
    (hooks/reviews.ts) — the drawer combines both. */
-"use client";
-
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { RunTrace } from "@devdigest/shared";
 import { api } from "../api";

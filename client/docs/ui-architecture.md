@@ -87,7 +87,7 @@ its 60 s poll, a window focus, or Refresh.
 | `?tab=` | `/agents/[id]` | `config` | `setTab` in `agents/[id]/page.tsx` |
 
 All writes copy the existing params first and add no history entries. The PR detail uses
-`router.replace`; the PR list (`pulls/hooks/usePullListParams.ts`) uses `window.history.replaceState`,
+`router.replace`; the PR list (`pulls/_lib/usePullListParams.ts`) uses `window.history.replaceState`,
 which Next syncs into `useSearchParams` without refetching the dynamic route's RSC payload on every
 keystroke. The
 repo is taken from the path (`/repos/:repoId/...`) by `RepoProvider`, falling back to

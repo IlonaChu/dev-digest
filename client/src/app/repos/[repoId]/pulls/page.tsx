@@ -18,7 +18,7 @@ import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { ApiError } from "@/lib/api";
 import { COLUMN_KEYS, SKELETON_ROWS } from "./constants";
 import { filterPulls, pullCounts } from "./helpers";
-import { usePullListParams } from "./hooks/usePullListParams";
+import { usePullListParams } from "./_lib/usePullListParams";
 import { s } from "./styles";
 import { PRRow } from "./_components/PRRow";
 import { FilterBar } from "./_components/FilterBar";

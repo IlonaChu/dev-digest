@@ -2,8 +2,6 @@
    settings, secrets, repos, pulls, and project context. Each domain exports a
    key factory + queryOptions (usable outside components: prefetch, invalidation)
    and thin hooks on top. */
-"use client";
-
 import { queryOptions, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { PrDetail, PrMeta, Repo, SecretsStatus, Settings } from "@devdigest/shared";

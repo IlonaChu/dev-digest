@@ -1,6 +1,9 @@
 /* hooks/ public API — React Query hooks, query options and key factories over
    the F1/feature APIs. Import from "@/lib/hooks" or from a domain file directly
-   (e.g. "@/lib/hooks/reviews"). Named re-exports only, so the surface is deliberate. */
+   (e.g. "@/lib/hooks/reviews"). Named re-exports only, so the surface is deliberate.
+   The domain files carry no "use client": hooks only run inside client components anyway,
+   and a directive would turn the key factories / queryOptions into client references that
+   a Server Component could not call for prefetching. */
 export {
   settingsKeys,
   settingsQuery,

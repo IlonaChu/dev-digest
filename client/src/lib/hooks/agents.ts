@@ -1,6 +1,4 @@
 /* hooks/agents.ts — React Query hooks for the A2 Agents tab + Agent Editor. */
-"use client";
-
 import { queryOptions, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { Agent } from "@devdigest/shared";

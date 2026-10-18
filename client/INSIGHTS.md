@@ -36,9 +36,11 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 - 2026-10-18 — data layer: each `src/lib/hooks/<domain>.ts` owns a key factory (`reviewKeys`, `pullKeys`, …) + `queryOptions` builders, and GETs pass a `@devdigest/shared` schema to `api.get(path, Schema)`; a mismatch throws `ApiError` 502 `invalid_response` (`src/lib/api.ts:78`), which the global query handler toasts (≥500) → invalidate via the factory, never inline arrays; a 502 `invalid_response` toast means client/server contract drift, not an API outage (`src/lib/api.test.ts`)
 - 2026-10-18 — PR-list filters `?status&q&sort` are written with `window.history.replaceState` (`pulls/hooks/usePullListParams.ts:21`), not `router.replace`: the route is dynamic (ƒ), so `router.replace` per keystroke refetches its RSC payload, while Next 15 syncs native history calls into `useSearchParams` → use the same for any high-frequency URL state
 - 2026-10-18 — code used by a parent route and its child lives in the nearest common ancestor (`pulls/_lib/severity.ts` for `FindingsPopover` + `SeverityFilter`), never in a sibling's `_components` (the old `FindingsPopover` → `[number]/_components/SeverityFilter` import) → check `rg '\.\./\.\./\[' src/app` for upward-then-down imports
+- 2026-10-18 — supersedes the path in 2026-10-18 "PR-list filters `?status&q&sort`": the hook moved to `pulls/_lib/usePullListParams.ts` (a non-underscored folder under `app/` is a route segment) and validates `status` against `STATUS_FILTERS`; `src/lib/hooks/*` carry no `"use client"` so Server Components can import key factories / `queryOptions` (`src/lib/hooks/index.ts` header) → don't re-add the directive to hook modules
 
 ## Tool & Library Notes
 <!-- Dependency/tool quirks, version-specific behaviour -->
+- 2026-10-18 — Next 15.5's patched `history.replaceState`/`pushState` push the new URL into the router inside `startTransition` (`node_modules/next/dist/client/components/app-router.js:291-297`), so `useSearchParams` lags the write; a text input whose `value` is read from the URL can lose characters / jump the caret → keep a local draft state for the input and only mirror it to the URL (`pulls/_lib/usePullListParams.ts`); build the next params from `window.location.search`, not the render-time `search`
 
 ## Recurring Errors & Fixes
 <!-- Error message → root cause → fix -->
@@ -65,6 +67,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 - 2026-10-18 — supersedes both 2026-10-18 "`ui-architecture` skill" entries: skill renamed to `frontend-architecture` (`.claude/skills/frontend-architecture/`); `client/docs/ui-architecture.md` is an unrelated client doc and keeps its name → don't rename it along with the skill
 - 2026-10-18 — Architecture plan, wave 1 (client): hard-coded strings moved to `messages/en/{common,prReview,agents,onboarding,shell,settings}.json` (home, PR detail/findings tab, run dropdown, agent card/editor, add-repo with `t.rich`, toasts, query errors, model settings); vendor/shared synced from server; typecheck + tests green
 - 2026-10-18 — Architecture plan, wave 3 (client): key factories + queryOptions + Zod-validated GETs, `env.ts`, `useRunLifecycle`, extensionAlias; severity helpers → `pulls/_lib`, explicit barrels, deep relatives → `@/`; PR-list `q`/`sort` in URL, `filterPulls`/`pullCounts` helpers, ConfigTab reset via `key`, `RunHistory` split into `CommitRow`/`RunRow`, trivial memoization removed, `error`/`global-error`/`not-found`, per-section metadata; typecheck, 77 tests and scratch `next build` green
+- 2026-10-18 — pr-self-review warnings fixed (client): search draft state + validated `?status` + hook in `_lib/`, page titles via `generateMetadata` + `meta.title` keys, hook modules directive-free; typecheck, 82 tests, scratch `next build` green
 
 ## Open Questions
 <!-- Unresolved or unverified — what to investigate and where -->

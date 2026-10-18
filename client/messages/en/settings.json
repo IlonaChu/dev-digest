@@ -143,5 +143,8 @@
     "exportFailed": "Export failed",
     "importSuccess": "Imported {agents} agents, {skills} skills",
     "importFailed": "Import failed — check the bundle JSON"
+  },
+  "meta": {
+    "title": "Settings"
   }
 }

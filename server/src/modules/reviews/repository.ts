@@ -14,7 +14,7 @@ import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
  */
 
 import type { FindingRow, PullRow } from '../../db/rows.js';
-import type { ReviewPull, ReviewRepoRef } from './types.js';
+import type { PersistedRun, ReviewPull, ReviewRepoRef } from './types.js';
 export type { FindingRow, PullRow };
 
 export type ReviewRow = typeof t.reviews.$inferSelect;
@@ -91,7 +91,7 @@ export class ReviewRepository {
     findings: Finding[];
     headSha: string;
     completion: Omit<RunCompletion, 'status' | 'findingsCount'>;
-  }): Promise<{ review: ReviewRow; findings: FindingRow[] }> {
+  }): Promise<PersistedRun> {
     return this.db.transaction(async (tx) => {
       const review = await reviewRepo.insertReview(tx, input.review);
       const findings = await reviewRepo.insertFindings(tx, review.id, input.findings);
@@ -101,7 +101,7 @@ export class ReviewRepository {
         status: 'done',
         findingsCount: findings.length,
       });
-      return { review, findings };
+      return { reviewId: review.id, findingsCount: findings.length };
     });
   }
 

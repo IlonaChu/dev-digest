@@ -29,6 +29,12 @@ export interface ReviewPull {
   body: string | null;
 }
 
+/** What a persisted successful run hands back to the executor. */
+export interface PersistedRun {
+  reviewId: string;
+  findingsCount: number;
+}
+
 export interface ReviewRepoRef {
   id: string;
   owner: string;

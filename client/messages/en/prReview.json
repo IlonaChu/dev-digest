@@ -165,5 +165,8 @@
     "deleteRun": "Delete this review run",
     "deleteConfirm": "Delete this \"{agent}\" review run and its findings?",
     "agentFallback": "agent"
+  },
+  "meta": {
+    "title": "Pull requests"
   }
 }

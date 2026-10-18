@@ -26,5 +26,8 @@
     "submit": "Add repository",
     "cloning": "Cloning…",
     "footer": "API keys live in Settings · <kbd>esc</kbd> to close"
+  },
+  "meta": {
+    "title": "Add repository"
   }
 }

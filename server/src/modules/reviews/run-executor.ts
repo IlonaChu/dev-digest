@@ -2,8 +2,8 @@ import type { Container } from '../../platform/container.js';
 import type { Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
-import type { ReviewRepository, FindingRow, ReviewRow } from './repository.js';
-import type { ReviewAgent, ReviewPull, ReviewRepoRef } from './types.js';
+import type { ReviewRepository } from './repository.js';
+import type { PersistedRun, ReviewAgent, ReviewPull, ReviewRepoRef } from './types.js';
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
@@ -26,9 +26,7 @@ export type Logger = {
 
 // A reduced "Review per file" — same schema as Review (the model returns a small
 // Review per file; we merge findings + take the worst verdict / mean score).
-export type RunOutcome = {
-  review: ReviewRow;
-  findings: FindingRow[];
+export type RunOutcome = PersistedRun & {
   grounding: string;
   raw: Review;
 };
@@ -115,11 +113,11 @@ export class ReviewRunExecutor {
           {
             runId,
             agent: agent.name,
-            findings: outcome.findings.length,
+            findings: outcome.findingsCount,
             grounding: outcome.grounding,
             durationMs: Date.now() - agentStart,
           },
-          `review: agent "${agent.name}" done — ${outcome.findings.length} finding(s)`,
+          `review: agent "${agent.name}" done — ${outcome.findingsCount} finding(s)`,
         );
       } catch (err) {
         // runOneAgent already persisted the failure/cancel (status + error +
@@ -222,7 +220,7 @@ export class ReviewRunExecutor {
       // ---- Persist review + findings + reviewed SHA + agent_runs (atomic) ---
       // The reviewed head SHA lets the PR list tell reviewed / needs-review
       // (head moved) / stale apart.
-      const { review, findings: findingRows } = await this.repo.persistRunOutcome({
+      const persisted = await this.repo.persistRunOutcome({
         runId,
         review: {
           workspaceId,
@@ -248,7 +246,7 @@ export class ReviewRunExecutor {
           error: null,
         },
       });
-      runLog.result(`Persisted review ${review.id} with ${findingRows.length} finding(s)`);
+      runLog.result(`Persisted review ${persisted.reviewId} with ${persisted.findingsCount} finding(s)`);
 
       // ---- Observability: ONE run_traces document ---------------------------
 
@@ -266,7 +264,7 @@ export class ReviewRunExecutor {
           tokens_in: tokensIn,
           tokens_out: tokensOut,
           cost_usd: costUsd,
-          findings: findingRows.length,
+          findings: persisted.findingsCount,
           grounding,
         },
         prompt_assembly: outcome.assembly,
@@ -287,7 +285,7 @@ export class ReviewRunExecutor {
       await this.repo.saveRunTrace(runId, trace);
       this.container.runBus.complete(runId);
 
-      return { review, findings: findingRows, grounding, raw: outcome.review };
+      return { ...persisted, grounding, raw: outcome.review };
     } catch (err) {
       // Failure/cancel: persist status + the error text + the log-so-far so the
       // run (and WHY it failed) is visible on the UI after a reload.

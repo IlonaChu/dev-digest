@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = { title: "Add repository" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("onboarding");
+  return { title: t("meta.title") };
+}
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return children;

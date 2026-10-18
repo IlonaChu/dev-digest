@@ -49,8 +49,8 @@ export class PullsService {
       }
     }
 
-    const prs = await this.repo.listForRepo(repo.id);
-    if (gh) await this.backfillDiffStats(gh, repo, prs, log);
+    const prs = await this.repo.listForRepo(workspaceId, repo.id);
+    if (gh) await this.backfillDiffStats(gh, workspaceId, repo, prs, log);
 
     const prIds = prs.map((p) => p.id);
     const latestByPr = latestReviewPerAgent(await this.repo.reviewsNewestFirst(prIds));
@@ -68,6 +68,7 @@ export class PullsService {
   /** Mutates `prs` in place so the response reflects the freshly-fetched stats. */
   private async backfillDiffStats(
     gh: GitHubClient,
+    workspaceId: string,
     repo: RepoRefRecord,
     prs: PullRecord[],
     log: WarnLogger,
@@ -76,7 +77,7 @@ export class PullsService {
       try {
         const detail = await gh.getPullRequest({ owner: repo.owner, name: repo.name }, pr.number);
         const stats = { additions: detail.additions, deletions: detail.deletions, filesCount: detail.files_count };
-        await this.repo.updateDiffStats(pr.id, stats);
+        await this.repo.updateDiffStats(workspaceId, pr.id, stats);
         Object.assign(pr, stats);
       } catch (err) {
         log.warn({ err, number: pr.number }, 'PR diff-stat backfill skipped');
@@ -95,11 +96,11 @@ export class PullsService {
     try {
       const gh = await this.container.github();
       const detail = await gh.getPullRequest({ owner: repo.owner, name: repo.name }, pr.number);
-      await this.repo.replaceDetailSnapshot(pr.id, detail);
+      await this.repo.replaceDetailSnapshot(workspaceId, pr.id, detail);
       return { ...detail, id: pr.id };
     } catch (err) {
       log.warn({ err }, 'GitHub PR detail refresh skipped (no token / offline); serving persisted detail');
-      return toPersistedDetail(pr, await this.repo.persistedDetail(pr.id));
+      return toPersistedDetail(pr, await this.repo.persistedDetail(workspaceId, pr.id));
     }
   }
 

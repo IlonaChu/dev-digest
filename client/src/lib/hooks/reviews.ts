@@ -1,7 +1,5 @@
 /* hooks/reviews.ts — React Query + SSE hooks for the A2 reviewer.
    Run a review, stream RunEvents live, act on findings. */
-"use client";
-
 import React from "react";
 import { queryOptions, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
