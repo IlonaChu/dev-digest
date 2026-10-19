@@ -3,7 +3,7 @@
    the vetting policy (409 `skill_blocked` when enabling a non-clean import). */
 import { queryOptions, useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { AgentSkillLink, Skill, SkillImportPreview, SkillVersion } from "@devdigest/shared";
+import { AgentSkillLink, Skill, SkillImportFile, SkillImportPreview, SkillVersion } from "@devdigest/shared";
 import type { SkillType } from "@devdigest/shared";
 import { api } from "../api";
 
@@ -157,6 +157,8 @@ export interface ImportSkillInput extends SkillFilePayload {
   name?: string;
   description?: string;
   type?: SkillType;
+  /** Set when the file came from `useFetchSkillFromUrl`; the server stores it as `imported_url`. */
+  source_url?: string;
 }
 
 /** Step 2 of import, after the user confirmed the preview. Saved DISABLED. */
@@ -168,6 +170,15 @@ export function useImportSkill() {
       qc.invalidateQueries({ queryKey: skillKeys.all });
       qc.setQueryData(skillKeys.detail(data.id), data);
     },
+  });
+}
+
+/** URL import, step 0: the server downloads the link (size- and time-capped) and hands back
+    the same upload payload, so preview + import run unchanged. Stores nothing. */
+export function useFetchSkillFromUrl() {
+  return useMutation({
+    mutationFn: async (url: string) =>
+      SkillImportFile.parse(await api.post<unknown>("/skills/import/fetch", { url })),
   });
 }
 

@@ -1,26 +1,68 @@
 {
+  "meta": {
+    "title": "Conventions · DevDigest"
+  },
   "page": {
     "crumbLab": "Skills Lab",
     "crumbConventions": "Conventions",
     "headingPrefix": "Conventions in ",
-    "repoFallback": "repo",
-    "subtitle": "Scan the cloned repo to surface house-rules — each backed by evidence you can turn into a Skill.",
+    "subtitleScanned": "{count, plural, one {Detected from # sample file} other {Detected from # sample files}} · last scan {time}",
+    "subtitleNone": "Scan the cloned repo to surface house rules, each backed by evidence you can turn into a skill.",
+    "droppedNote": "{count, plural, one {# proposal was dropped} other {# proposals were dropped}}: the evidence did not check out in the code.",
+    "runScan": "Run Scan",
+    "rescan": "ReScan",
     "scanning": "Scanning…",
-    "rescan": "Re-scan",
-    "runExtraction": "Run extraction",
-    "extractionFailed": "Extraction failed",
     "loadError": "Could not load conventions.",
+    "extractError": "Extraction failed",
+    "notReadyTitle": "The repository is not ready to scan",
     "empty": {
       "title": "No conventions extracted yet",
-      "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
-      "cta": "Run extraction"
+      "body": "Scan the repo to surface house rules (naming, error handling, structure), each backed by evidence you can turn into a skill.",
+      "cta": "Run Scan"
     },
-    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
+    "noneFound": {
+      "title": "No convention passed the evidence check",
+      "body": "The model proposed nothing the code could confirm. Try again after the repository index is up to date."
+    }
+  },
+  "selection": {
+    "deselectAll": "Deselect all",
+    "selectAll": "Select all",
+    "count": "{accepted} of {total} accepted",
+    "createSkill": "Create skill"
   },
   "card": {
     "confidence": "Confidence",
     "accepted": "Accepted",
-    "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "accept": "Accept",
+    "reject": "Reject",
+    "edit": "Edit",
+    "editLabel": "Rule text",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edited": "edited",
+    "copyLocation": "Copy file location",
+    "copied": "Copied"
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "banner": "Merged from <b>{count, plural, one {# accepted convention} other {# accepted conventions}}</b> in <name>{repo}</name>. Everything below is editable before you save.",
+    "name": "Name",
+    "description": "Description",
+    "type": "Type",
+    "enabled": "Enabled",
+    "enabledHint": "Whether this block is added to agents' prompts.",
+    "body": "Skill body",
+    "savedAs": "Saved as v1 · added to Skills Lab",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "creating": "Creating…",
+    "nameTaken": "A skill with this name already exists. Pick another name.",
+    "discard": "Discard your edits to the skill?",
+    "draftError": "Could not prepare the skill draft."
+  },
+  "toast": {
+    "created": "Skill {name} created",
+    "attach": "Attach to agent"
   }
 }

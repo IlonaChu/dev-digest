@@ -1,66 +1,49 @@
-/* Skill Config tab — name, description (the skill's interface), type, body (Markdown)
-   and the enabled switch. Also used to create a new skill (no `skill`). The form is
-   seeded once; the parent keys this by skill id (+ version) to reset it after a save. */
+/* Skill Config tab — name, description (the skill's interface), type, body (Markdown);
+   the enabled switch and the Save button sit in the header row. The switch is live
+   (one PUT per flip, exactly like the card switch in the list) and reads the saved
+   skill, so a flip in the list shows here at once; only the text fields wait for
+   Save. The form is seeded once; the parent keys this by skill id (+ version). */
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, Button, FormField, SelectInput, TextInput, Toggle } from "@devdigest/ui";
 import type { Skill, SkillType } from "@devdigest/shared";
 import { VettingPanel } from "@/components/VettingPanel";
-import { useCreateSkill, useRevetSkill, useUpdateSkill } from "@/lib/hooks/skills";
+import { useRevetSkill, useUpdateSkill } from "@/lib/hooks/skills";
 import { blockReasonKey, requiresVetting, skillBlockReason } from "@/lib/skill-policy";
 import { useToast } from "@/lib/toast";
-import { DEFAULT_SKILL_TYPE, SKILL_TYPES } from "@/app/skills/constants";
+import { SKILL_TYPES } from "@/app/skills/constants";
 import { changedFields, createsVersion, formFrom } from "./helpers";
-import { MarkdownEditor } from "./_components/MarkdownEditor";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { s } from "./styles";
 
 const noop = () => {};
 
-export function ConfigTab({ skill }: { skill?: Skill }) {
+export function ConfigTab({ skill }: { skill: Skill }) {
   const t = useTranslations("skills");
-  const router = useRouter();
   const toast = useToast();
-  const create = useCreateSkill();
   const update = useUpdateSkill();
+  const toggle = useUpdateSkill();
   const revet = useRevetSkill();
-  const [form, setForm] = React.useState(() => formFrom(skill, { type: DEFAULT_SKILL_TYPE }));
+  const [form, setForm] = React.useState(() => formFrom(skill));
   const [note, setNote] = React.useState("");
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const patch = skill ? changedFields(skill, form) : {};
-  const dirty = skill ? Object.keys(patch).length > 0 : form.name.trim() !== "" || form.body !== "";
-  const needsNote = skill ? createsVersion(skill, form) : false;
-  const canSave = form.name.trim() !== "" && form.body.trim() !== "" && (skill ? dirty : true);
-  const pending = create.isPending || update.isPending;
+  const patch = changedFields(skill, form);
+  const dirty = Object.keys(patch).length > 0;
+  const needsNote = createsVersion(skill, form);
+  const canSave = form.name.trim() !== "" && form.body.trim() !== "" && dirty;
+  const pending = update.isPending;
 
-  const reason = skill ? skillBlockReason(skill) : null;
+  const reason = skillBlockReason(skill);
   // A blocked skill stays off; switching an already-enabled one OFF is always allowed.
-  const enableLocked = reason !== null && !form.enabled;
+  const enableLocked = reason !== null && !skill.enabled;
+  const setEnabled = (enabled: boolean) => toggle.mutate({ id: skill.id, patch: { enabled } });
 
-  const save = () => {
-    if (!skill) {
-      create.mutate(
-        {
-          name: form.name.trim(),
-          description: form.description,
-          type: form.type,
-          body: form.body,
-          enabled: form.enabled,
-        },
-        {
-          onSuccess: (created) => {
-            toast.success(t("config.createdToast"));
-            router.replace(`/skills/${created.id}?tab=config`);
-          },
-        },
-      );
-      return;
-    }
+  const save = () =>
     update.mutate(
       {
         id: skill.id,
@@ -73,23 +56,24 @@ export function ConfigTab({ skill }: { skill?: Skill }) {
         },
       },
     );
-  };
 
   return (
     <div style={s.wrap}>
       <div style={s.header}>
         <h2 style={s.h2}>{t("config.title")}</h2>
-        {skill && (
-          <Badge mono icon="GitCommit">
-            {t("preview.version", { version: skill.version })}
-          </Badge>
-        )}
+        <Badge mono icon="GitCommit">
+          {t("preview.version", { version: skill.version })}
+        </Badge>
         <label style={s.enabledLabel}>
           {t("config.enabled")}
           <span style={enableLocked ? s.blockedWrap : undefined} aria-disabled={enableLocked || undefined}>
-            <Toggle on={form.enabled} onChange={enableLocked ? noop : (v) => set("enabled", v)} size={16} />
+            <Toggle on={skill.enabled} onChange={enableLocked || toggle.isPending ? noop : setEnabled} size={16} />
           </span>
         </label>
+        {update.isSuccess && !dirty && <span style={s.savedNote}>{t("config.saved", { version: update.data?.version })}</span>}
+        <Button kind="primary" size="sm" icon="Check" onClick={save} disabled={!canSave || pending}>
+          {pending ? t("config.saving") : t("config.save")}
+        </Button>
       </div>
       {enableLocked && reason && (
         <div style={s.blockedNote}>
@@ -97,7 +81,7 @@ export function ConfigTab({ skill }: { skill?: Skill }) {
         </div>
       )}
 
-      {skill && requiresVetting(skill.source) && skill.vetting && (
+      {requiresVetting(skill.source) && skill.vetting && (
         <div style={s.vetting}>
           <VettingPanel
             vetting={skill.vetting}
@@ -107,7 +91,7 @@ export function ConfigTab({ skill }: { skill?: Skill }) {
           />
         </div>
       )}
-      {skill && requiresVetting(skill.source) && !skill.vetting && (
+      {requiresVetting(skill.source) && !skill.vetting && (
         <div style={s.vetting}>
           <div style={s.blockedNote}>{t("vetting.notChecked")}</div>
           <Button kind="ghost" size="sm" icon="RefreshCw" onClick={() => revet.mutate(skill.id)} loading={revet.isPending}>
@@ -130,7 +114,7 @@ export function ConfigTab({ skill }: { skill?: Skill }) {
         <SelectInput
           value={form.type}
           onChange={(v) => set("type", v as SkillType)}
-          options={SKILL_TYPES.map((v) => ({ value: v, label: t(`type.${v}`) }))}
+          options={SKILL_TYPES.map((v) => ({ value: v, label: t(`typeLabel.${v}`) }))}
         />
       </FormField>
       <FormField label={t("config.body")} required>
@@ -138,7 +122,7 @@ export function ConfigTab({ skill }: { skill?: Skill }) {
           value={form.body}
           onChange={(v) => set("body", v)}
           fileName={form.name}
-          dirty={skill ? form.body !== skill.body : form.body !== ""}
+          dirty={form.body !== skill.body}
           placeholder={t("config.bodyPlaceholder")}
         />
       </FormField>
@@ -147,12 +131,6 @@ export function ConfigTab({ skill }: { skill?: Skill }) {
           <TextInput value={note} onChange={setNote} placeholder={t("config.changeNotePlaceholder")} />
         </FormField>
       )}
-      <div style={s.actions}>
-        <Button kind="primary" icon="Check" onClick={save} disabled={!canSave || pending}>
-          {pending ? t("config.saving") : skill ? t("config.save") : t("config.create")}
-        </Button>
-        {update.isSuccess && !dirty && <span style={s.savedNote}>{t("config.saved", { version: update.data?.version })}</span>}
-      </div>
     </div>
   );
 }

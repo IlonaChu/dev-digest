@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Container } from '../src/platform/container.js';
 import type { SkillRow } from '../src/db/rows.js';
-import { MockLLMProvider } from '../src/adapters/mocks.js';
+import { MockLLMProvider, MockUrlFetcher } from '../src/adapters/mocks.js';
 import { AppError } from '../src/platform/errors.js';
 import type { ArchiveReader } from '../src/modules/skills/ports.js';
 import { SkillsService } from '../src/modules/skills/service.js';
@@ -71,7 +71,7 @@ class FakeRepo {
 const b64 = (s: string) => Buffer.from(s).toString('base64');
 const noArchive: ArchiveReader = { listEntries: () => [], readText: () => '' };
 
-function setup(verdict: 'clean' | 'suspicious' | 'malicious' = 'clean') {
+function setup(verdict: 'clean' | 'suspicious' | 'malicious' = 'clean', urlFetcher = new MockUrlFetcher()) {
   const repo = new FakeRepo();
   const llm = new MockLLMProvider('openai', {
     structuredBySchema: { SkillVetting: { verdict, reasons: [] } },
@@ -79,6 +79,7 @@ function setup(verdict: 'clean' | 'suspicious' | 'malicious' = 'clean') {
   const container = {
     skillsRepo: repo,
     archive: noArchive,
+    urlFetcher,
     settingsRepo: { get: async () => ({}) },
     llm: async () => llm,
   } as unknown as Container;
@@ -209,5 +210,50 @@ describe('enabling an imported skill', () => {
     const spy = vi.spyOn(llm, 'completeStructured');
     await service.vet(WS, s.id);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('import from URL', () => {
+  const RAW = 'https://raw.githubusercontent.com/acme/skills/main/SKILL.md';
+  const MD = '---\nname: remote-rubric\ntype: rubric\n---\n# Remote\nFlag retries without a cap.';
+
+  it('fetches the file (GitHub page → raw) and returns the upload payload without storing anything', async () => {
+    const fetcher = new MockUrlFetcher({ [RAW]: MD });
+    const { service, repo } = setup('clean', fetcher);
+    const file = await service.fetchImport('https://github.com/acme/skills/blob/main/SKILL.md#intro');
+    expect(file).toEqual({ filename: 'SKILL.md', content_base64: b64(MD), source_url: RAW });
+    expect(fetcher.calls).toEqual([{ url: RAW, maxBytes: 1024 * 1024, timeoutMs: 15_000 }]);
+    expect(repo.rows.size).toBe(0);
+  });
+
+  it('names an extension-less download by its content type', async () => {
+    const fetcher = new MockUrlFetcher({
+      'https://example.com/skills/retry': { bytes: new TextEncoder().encode(MD), contentType: 'text/plain' },
+    });
+    const { service } = setup('clean', fetcher);
+    expect((await service.fetchImport('https://example.com/skills/retry')).filename).toBe('retry.md');
+  });
+
+  it('rejects non-http URLs before fetching and wraps a failed download as 422 skill_fetch_failed', async () => {
+    const fetcher = new MockUrlFetcher();
+    const { service } = setup('clean', fetcher);
+    await expect(service.fetchImport('ftp://example.com/SKILL.md')).rejects.toMatchObject({ statusCode: 422 });
+    expect(fetcher.calls).toHaveLength(0);
+    await expect(service.fetchImport('https://example.com/missing.md')).rejects.toMatchObject({
+      code: 'skill_fetch_failed',
+      statusCode: 422,
+    });
+  });
+
+  it('a download that is not a skill file fails at fetch time, not at preview', async () => {
+    const fetcher = new MockUrlFetcher({ 'https://example.com/blob.md': { bytes: new Uint8Array([0, 1, 2]) } });
+    const { service } = setup('clean', fetcher);
+    await expect(service.fetchImport('https://example.com/blob.md')).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it('confirming with source_url stores a DISABLED imported_url skill, vetted like a file import', async () => {
+    const { service } = setup('clean');
+    const s = await service.importSkill(WS, 'SKILL.md', b64(MD), { source_url: RAW });
+    expect(s).toMatchObject({ source: 'imported_url', enabled: false, vetting: { status: 'clean', version: 1 } });
   });
 });

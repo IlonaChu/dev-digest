@@ -10,6 +10,8 @@ in the DB). The canonical, reviewable copies live next to this file:
 - [`security-reviewer.md`](./security-reviewer.md)
 - [`performance-reviewer.md`](./performance-reviewer.md)
 - [`test-quality-reviewer.md`](./test-quality-reviewer.md) — ships with 4 linked skills (see `server/specs/L02-skills.md`)
+- [`api-contract-reviewer.md`](./api-contract-reviewer.md) — ships with 3 linked skills; the 4th, `deprecation-policy`,
+  is imported from [`../demo-skills/deprecation-policy.zip`](../demo-skills/deprecation-policy.zip) (see `server/specs/L02-skills.md`)
 
 > The DB is the source of truth at run time. These files are the human-readable
 > originals — when you change a prompt, edit the file here **and** push it to the

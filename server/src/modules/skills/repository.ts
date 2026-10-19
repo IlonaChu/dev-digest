@@ -22,6 +22,8 @@ export interface InsertSkill {
   body: string;
   enabled: boolean;
   vetting?: SkillVetting | null;
+  /** Files the skill was derived from (extracted skills). */
+  evidenceFiles?: string[] | null;
 }
 
 export interface UpdateSkill {
@@ -93,6 +95,7 @@ export class SkillsRepository {
             enabled: values.enabled,
             version: INITIAL_SKILL_VERSION,
             vetting: values.vetting ?? null,
+            evidenceFiles: values.evidenceFiles ?? null,
           })
           .returning();
         await tx.insert(t.skillVersions).values({

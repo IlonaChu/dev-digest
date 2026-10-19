@@ -11,14 +11,20 @@ instructions inside our prompt, so it is vetted before it can be enabled.
 - CRUD over `skills`; the DB is the source of truth. Versions in `skill_versions` (body + description snapshot).
 - Link skills to agents (`agent_skills`): order + a per-agent `enabled` switch.
 - Import from `.md` or `.zip` → preview (nothing stored) → confirm → stored **disabled**.
+- Import from a public URL: the server downloads the file (http(s) only, 1 MiB / 15 s caps, GitHub file pages
+  → raw) and returns the same upload payload, so preview → confirm run unchanged; stored as `source='imported_url'`.
 - Vetting of imported skills (rules + LLM); only `clean` may be enabled.
 - Prompt assembly: enabled skills as `### Skill:` blocks, with a per-skill token count in the trace.
 - Seed: Test Quality Reviewer + 4 skills linked in order.
+- Seed: API Contract Reviewer + 3 skills linked in order (`breaking-change`, `response-schema`,
+  `semver-discipline`). Its 4th skill, `deprecation-policy`, is NOT seeded: it ships as
+  `docs/demo-skills/deprecation-policy.zip` (source `docs/demo-skills/deprecation-policy/SKILL.md`) and is
+  imported through the UI (Add skill → From file → preview → Save → vetting `clean` → enable → link as 4th on the
+  agent's Skills tab), so a new agent carries an `imported` skill that went through preview and vetting.
 
 **Out**
-- Import from URL / community catalog, Evals, Stats, "Run on evals".
+- Community catalog, Evals, Stats, "Run on evals".
 - Bumping the agent's version when its skill links change.
-- API Contract Reviewer agent.
 
 ## Data
 Migration `0012_*` (generated): `skills.vetting jsonb`, unique `(workspace_id, name)`, `skill_versions.description`
@@ -37,8 +43,9 @@ and `.message`, `agent_skills.enabled` (default true) + index on `skill_id`. `sk
 | `DELETE /skills/:id` | cascades links and versions |
 | `GET /skills/:id/versions` | newest first |
 | `POST /skills/:id/versions/:version/restore` | |
+| `POST /skills/import/fetch` | `{url}` → `SkillImportFile` (`{filename, content_base64, source_url}`); downloads only, stores nothing; `422 skill_fetch_failed` when the download fails |
 | `POST /skills/import/preview` | `{filename, content_base64}` → `SkillImportPreview`, stores nothing |
-| `POST /skills/import` | file + `{name?, description?, type?}`; server re-parses and re-vets, saves `enabled=false`, `source='imported'` |
+| `POST /skills/import` | file + `{name?, description?, type?, source_url?}`; server re-parses and re-vets, saves `enabled=false`, `source='imported'` (`'imported_url'` when `source_url` is set) |
 | `POST /skills/:id/vet` | re-run the check (imported skills only) |
 | `POST /agents/:id/skills` | `{links:[{skill_id, enabled}]}` ordered, replaces the set; legacy `skill_ids`/`skill_id` still work; foreign-workspace skill → 422 |
 
@@ -75,4 +82,7 @@ the trace's `prompt_assembly.skills_meta` carries `{id, name, version, tokens}`.
 3. A non-`clean` imported skill cannot be enabled (409), including via `PUT`.
 4. A globally disabled, link-disabled or unvetted-imported skill is absent from the prompt and the log.
 5. `skills_meta` token counts appear in the trace.
-6. `pnpm typecheck && pnpm test` green, IT tests actually ran, `pnpm arch:check` clean.
+6. The seeded Test Quality Reviewer (4 skills) and API Contract Reviewer (3 skills) inject their skills in link
+   order; the API Contract prompt takes its compatibility rubric only from its skills, so a run without them is
+   the control case for the skills.
+7. `pnpm typecheck && pnpm test` green, IT tests actually ran, `pnpm arch:check` clean.

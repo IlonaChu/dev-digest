@@ -1,13 +1,13 @@
-/* SkillCard — name, type, description, source, "N agents" and the global enabled
-   switch. An imported skill that did not pass the safety check cannot be switched
-   on: the switch is inert and a badge says why (the server enforces it too). */
+/* SkillCard — name + type, description, "Source · vN", "N agents" and the global
+   enabled switch. An imported skill that did not pass the safety check cannot be
+   switched on: the switch is inert and a badge says why (the server enforces it too). */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, Toggle } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
-import { SkillTypeBadge, TYPE_COLOR } from "@/components/SkillTypeBadge";
+import { SkillTypeBadge } from "@/components/SkillTypeBadge";
 import { blockReasonKey, skillBlockReason } from "@/lib/skill-policy";
 import { s } from "./styles";
 
@@ -34,14 +34,12 @@ export function SkillCard({
   return (
     <div onClick={onClick} style={s.card(!!active, skill.enabled)}>
       <div style={s.headerRow}>
-        <div style={s.iconBox(TYPE_COLOR[skill.type])}>
-          <Icon.Sparkles size={15} />
-        </div>
-        <span className="mono" style={s.name}>
+        <span className="mono" style={s.name} title={skill.name}>
           {skill.name}
         </span>
+        <SkillTypeBadge type={skill.type} />
         {onToggle && (
-          <div onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()} style={s.toggle}>
             <span
               style={blocked ? s.toggleBlocked : undefined}
               title={blocked ? t("card.blockedToggle") : undefined}
@@ -67,10 +65,16 @@ export function SkillCard({
           </button>
         )}
       </div>
-      <div style={s.description}>{skill.description || t("card.noDescription")}</div>
-      <div style={s.metaRow}>
-        <SkillTypeBadge type={skill.type} />
-        <span style={s.source}>{t(`source.${skill.source}`)}</span>
+      <div style={s.description} title={skill.description || undefined}>
+        {skill.description || t("card.noDescription")}
+      </div>
+      <div style={s.meta}>{t("card.meta", { source: t(`source.${skill.source}`), version: skill.version })}</div>
+      <div style={s.footerRow}>
+        {skill.agent_count != null && (
+          <Badge icon="Cpu" color="var(--text-secondary)" bg="var(--bg-hover)">
+            {t("card.agents", { count: skill.agent_count })}
+          </Badge>
+        )}
         {reason && (
           <span title={t(`vetting.${blockReasonKey(reason)}`)}>
             <Badge color="var(--warn)" bg="var(--warn-bg)" icon="AlertTriangle">
@@ -80,7 +84,6 @@ export function SkillCard({
             </Badge>
           </span>
         )}
-        {skill.agent_count != null && <span style={s.agents}>{t("card.agents", { count: skill.agent_count })}</span>}
       </div>
     </div>
   );

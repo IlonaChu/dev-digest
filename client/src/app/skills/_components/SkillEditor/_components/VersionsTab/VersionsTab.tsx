@@ -1,5 +1,6 @@
-/* Skill Versions tab — every save of the body/description snapshots it. Diff compares
-   an old version with the current text; Restore saves the old text as a NEW version. */
+/* Skill Versions tab — every save of the body/description snapshots it. "Diff" unfolds
+   the row: the current version shows its body, an older one its line diff against the
+   current text. Restore saves the old text as a NEW version. */
 "use client";
 
 import React from "react";
@@ -8,7 +9,7 @@ import { Badge, Button, ErrorState, Skeleton } from "@devdigest/ui";
 import type { Skill, SkillVersion } from "@devdigest/shared";
 import { useRestoreSkillVersion, useSkillVersions } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
-import { DiffModal } from "./_components/DiffModal";
+import { VersionDiff } from "./_components/VersionDiff";
 import { shortDate } from "./helpers";
 import { s } from "./styles";
 
@@ -17,9 +18,17 @@ export function VersionsTab({ skill }: { skill: Skill }) {
   const toast = useToast();
   const { data: versions, isLoading, isError, refetch } = useSkillVersions(skill.id);
   const restore = useRestoreSkillVersion();
-  const [diffing, setDiffing] = React.useState<SkillVersion | null>(null);
+  const [open, setOpen] = React.useState<ReadonlySet<number>>(() => new Set());
 
   const list = [...(versions ?? [])].sort((a, b) => b.version - a.version);
+
+  const toggle = (version: number) =>
+    setOpen((cur) => {
+      const next = new Set(cur);
+      if (next.has(version)) next.delete(version);
+      else next.add(version);
+      return next;
+    });
 
   const onRestore = (v: SkillVersion) => {
     if (!window.confirm(t("versions.restoreConfirm", { version: v.version }))) return;
@@ -31,7 +40,6 @@ export function VersionsTab({ skill }: { skill: Skill }) {
 
   return (
     <div style={s.wrap}>
-      {diffing && <DiffModal version={diffing} current={skill} onClose={() => setDiffing(null)} />}
       <div style={s.head}>
         <h2 style={s.h2}>{t("versions.title")}</h2>
         <Badge>{t("versions.count", { count: list.length })}</Badge>
@@ -43,27 +51,29 @@ export function VersionsTab({ skill }: { skill: Skill }) {
       <div style={s.list}>
         {list.map((v) => {
           const current = v.version === skill.version;
+          const expanded = open.has(v.version);
           return (
             <div key={v.version} style={s.row(current)}>
-              <Badge mono>{`v${v.version}`}</Badge>
-              <div style={s.info}>
-                <div style={v.message ? s.note : s.noteEmpty}>{v.message || t("versions.noNote")}</div>
-                <div style={s.date}>{shortDate(v.created_at)}</div>
-              </div>
-              {current ? (
-                <Badge color="var(--ok)" bg="var(--ok-bg)" dot>
-                  {t("versions.current")}
-                </Badge>
-              ) : (
+              <div style={s.rowHead} title={shortDate(v.created_at)}>
+                <span className="mono" style={s.version}>{`v${v.version}`}</span>
+                {current && (
+                  <Badge color="var(--ok)" bg="transparent" dot style={s.current}>
+                    {t("versions.current")}
+                  </Badge>
+                )}
+                {v.message && <span style={s.note}>{v.message}</span>}
                 <div style={s.actions}>
-                  <Button kind="ghost" size="sm" icon="Eye" onClick={() => setDiffing(v)}>
-                    {t("versions.diff")}
+                  <Button kind={expanded ? "secondary" : "ghost"} size="sm" onClick={() => toggle(v.version)} aria-expanded={expanded}>
+                    {expanded ? t("versions.hide") : t("versions.diff")}
                   </Button>
-                  <Button kind="ghost" size="sm" icon="History" onClick={() => onRestore(v)} disabled={restore.isPending}>
-                    {t("versions.restore")}
-                  </Button>
+                  {!current && (
+                    <Button kind="secondary" size="sm" onClick={() => onRestore(v)} disabled={restore.isPending}>
+                      {t("versions.restore")}
+                    </Button>
+                  )}
                 </div>
-              )}
+              </div>
+              {expanded && <VersionDiff version={v} current={skill} />}
             </div>
           );
         })}

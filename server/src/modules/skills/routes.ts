@@ -5,7 +5,7 @@ import { SkillType } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
-import { IMPORT_BODY_LIMIT, MAX_DESCRIPTION_LENGTH } from './constants.js';
+import { IMPORT_BODY_LIMIT, MAX_DESCRIPTION_LENGTH, MAX_URL_LENGTH } from './constants.js';
 import { SkillsService } from './service.js';
 
 /**
@@ -18,8 +18,10 @@ import { SkillsService } from './service.js';
  *   GET    /skills/:id/versions                     → version history (newest first)
  *   POST   /skills/:id/versions/:version/restore    → restore as a new version
  *   POST   /skills/:id/vet                          → re-run vetting (imported skills only)
+ *   POST   /skills/import/fetch                     → download a .md/.zip by URL, stores nothing
  *   POST   /skills/import/preview                   → parse + vet a .md/.zip, stores nothing
  *   POST   /skills/import                           → confirm: stored disabled, source 'imported'
+ *                                                     (or 'imported_url' when `source_url` is set)
  */
 
 const RestoreParams = z.object({
@@ -53,6 +55,12 @@ const ImportBody = ImportPreviewBody.extend({
   name: z.string().trim().min(1).max(120).optional(),
   description: z.string().max(MAX_DESCRIPTION_LENGTH).optional(),
   type: SkillType.optional(),
+  /** Present when the file came from `/skills/import/fetch`. */
+  source_url: z.string().url().max(MAX_URL_LENGTH).optional(),
+});
+
+const ImportFetchBody = z.object({
+  url: z.string().trim().min(1).max(MAX_URL_LENGTH),
 });
 
 export default async function skillsRoutes(appBase: FastifyInstance) {
@@ -65,6 +73,11 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
   });
 
   // Static `/skills/import*` routes win over `/skills/:id` in find-my-way.
+  app.post('/skills/import/fetch', { schema: { body: ImportFetchBody } }, async (req) => {
+    await getContext(app.container, req);
+    return service.fetchImport(req.body.url);
+  });
+
   app.post(
     '/skills/import/preview',
     { bodyLimit: IMPORT_BODY_LIMIT, schema: { body: ImportPreviewBody } },
@@ -79,11 +92,12 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
     { bodyLimit: IMPORT_BODY_LIMIT, schema: { body: ImportBody } },
     async (req, reply) => {
       const { workspaceId } = await getContext(app.container, req);
-      const { filename, content_base64, name, description, type } = req.body;
+      const { filename, content_base64, name, description, type, source_url } = req.body;
       const skill = await service.importSkill(workspaceId, filename, content_base64, {
         ...(name !== undefined ? { name } : {}),
         ...(description !== undefined ? { description } : {}),
         ...(type !== undefined ? { type } : {}),
+        ...(source_url !== undefined ? { source_url } : {}),
       });
       reply.status(201);
       return skill;

@@ -43,7 +43,7 @@ describe("SkillCard", () => {
     renderCard(<SkillCard skill={SKILL} />);
     expect(screen.getByText("pr-quality-rubric")).toBeInTheDocument();
     expect(screen.getByText("rubric")).toBeInTheDocument();
-    expect(screen.getByText("Manual")).toBeInTheDocument();
+    expect(screen.getByText("Manual · v5")).toBeInTheDocument();
     expect(screen.getByText("Rubric for evaluating overall PR quality")).toBeInTheDocument();
     expect(screen.getByText("3 agents")).toBeInTheDocument();
   });
@@ -82,7 +82,7 @@ describe("SkillCard", () => {
     fireEvent.click(screen.getByRole("switch"));
     expect(onToggle).not.toHaveBeenCalled();
     expect(screen.getByText("malicious")).toBeInTheDocument();
-    expect(screen.getByText("Imported")).toBeInTheDocument();
+    expect(screen.getByText("Imported · v1")).toBeInTheDocument();
   });
 
   it("lets an imported skill that passed the check be switched on", () => {

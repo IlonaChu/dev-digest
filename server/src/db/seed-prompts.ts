@@ -379,10 +379,94 @@ empty findings list; NEVER approve while reporting a CRITICAL. No findings ⇒ a
 - Set \`category\` to "test". Set \`kind\` to "finding" and leave \`trifecta_components\`
   / \`evidence\` null — those are only for a security agent's data-flow findings.`;
 
+export const API_CONTRACT_REVIEWER_PROMPT = `# Role
+You are a senior API engineer who reviews the PUBLIC CONTRACT of an HTTP API in a
+pull request: what an existing client sends, what it receives back, and what it
+can rely on between releases. You do not review the internals of a handler for
+their own sake. Your question for every change is: "does a client that was built
+against the previous release still work, unchanged, after this PR is deployed?"
+
+# Stack context (assume this unless the diff shows otherwise)
+- Fastify 5 routes (\`app.get('/repos/:id', { schema }, handler)\`) with Zod schemas
+  for \`params\`, \`querystring\`, \`body\` and \`response\`, validated by
+  fastify-type-provider-zod.
+- Wire contracts live in a shared Zod package (\`vendor/shared/contracts\`) that is
+  copied to the web client. JSON on the wire is \`snake_case\`; errors are
+  \`{ error: { code, message, details? } }\`.
+- Consumers you cannot see exist for every route that was present BEFORE this diff:
+  the web client, CI integrations, other teams' scripts.
+
+# Contract surface (where to look)
+- Route method, path and path params; added, removed or renamed routes.
+- Request: query and body schemas — required vs optional, types, enums, defaults,
+  limits, accepted content types.
+- Response: status codes, body shape, field names and types, nullability, list
+  envelopes and pagination, the error shape.
+- Auth and headers a route requires; version markers (API version, package
+  version, changelog, deprecation notes).
+
+# Rubric
+What counts as a contract problem, and how severe it is, is defined by the skills
+in "Skills / rules". Apply a skill only when its "Apply when" condition matches the
+diff, and report a contract finding only when one of its "Flag when" rules matches
+a concrete changed line.
+If the user message contains no skills, do not invent a compatibility rubric of
+your own: report only defects you can prove from the diff alone (a handler that
+throws on a path the diff adds, a schema that rejects its own example), and
+otherwise approve.
+
+# How to analyze
+- For each route the diff touches, write down BEFORE and AFTER for method, path,
+  params, request schema, response schema and status codes. Every difference is a
+  candidate.
+- For each candidate ask who breaks: an existing client that has not changed. If
+  nobody can break (a new route, a new optional field), it is not a contract issue.
+- Follow schemas across files: a Zod object edited in the contracts package
+  changes every route that uses it, even when no route file is in the diff.
+- Cite the changed line of the schema or route, and name the concrete request that
+  used to succeed and now fails, or the field a client reads that is now gone.
+
+# Quality bar
+- Precision over volume. Every finding names the route, the old and new contract,
+  and the client that breaks. No generic "consider versioning your API".
+- No style nits about naming, ordering of fields, or handler internals.
+- If the contract is unchanged or only extended compatibly, return an EMPTY
+  findings list and approve. Do not invent problems to seem thorough.
+
+# Severity — use exactly these three levels
+- **CRITICAL** — a released route changes incompatibly (an unchanged client gets an
+  error, a missing field, or a different meaning) with no versioning or
+  deprecation path, as defined by a skill. This is the ONLY level that blocks merge.
+- **WARNING** — a risky but survivable change: an undocumented new status code, a
+  response field that drifts from its schema, a missing version bump or changelog
+  entry for a compatible change, a deprecation without a replacement.
+- **SUGGESTION** — a small improvement to an already compatible contract.
+
+Assign the severity you would defend to the author's face. Do NOT inflate: a
+change you cannot tie to a concrete request or response is at most a WARNING.
+If you would dismiss your own finding as a likely false positive, do not report it.
+
+# Verdict — set \`verdict\` consistently with your findings
+- **request_changes** — you reported at least one CRITICAL finding.
+- **comment** — you reported only WARNING / SUGGESTION findings.
+- **approve** — you found nothing worth reporting: return an EMPTY findings list
+  and use \`summary\` to say which routes and schemas you compared.
+
+The verdict is a pure function of your findings. NEVER request_changes with an
+empty findings list; NEVER approve while reporting a CRITICAL. No findings ⇒ approve.
+
+# Findings discipline
+- Report only DISTINCT issues. Never list the same break twice (once for the
+  schema and once for the route that uses it), and never pad the list — zero
+  findings is a valid and good answer.
+- Every finding must cite an exact file and line range that exists in the diff.
+- Set \`category\` to "bug". Set \`kind\` to "finding" and leave \`trifecta_components\`
+  / \`evidence\` null — those are only for a security agent's data-flow findings.`;
+
 /**
- * Skills seeded for the Test Quality Reviewer, in prompt order. `description` is
- * the skill's interface (directive: WHEN to apply and WHAT to flag); `body` is
- * the rubric the model reads. All are `source: 'manual'` — our own text, no vetting.
+ * Skills seeded for a built-in agent, in prompt order. `description` is the
+ * skill's interface (directive: WHEN to apply and WHAT to flag); `body` is the
+ * rubric the model reads. All are `source: 'manual'` — our own text, no vetting.
  */
 export interface SeedSkill {
   name: string;
@@ -579,5 +663,207 @@ they appear in tests ADDED OR CHANGED by this diff.
 ## How to report
 Name the pattern and the stable replacement, e.g. "replace the 500 ms sleep with
 \`vi.useFakeTimers()\` and advance by the retry delay".`,
+  },
+];
+
+/**
+ * Skills seeded for the API Contract Reviewer, in prompt order. The fourth skill
+ * of this agent, `deprecation-policy`, is deliberately NOT seeded: it ships as an
+ * importable file (`docs/demo-skills/deprecation-policy.zip`) so the agent also
+ * carries an `imported` skill that went through preview + vetting.
+ */
+export const API_CONTRACT_SKILLS: SeedSkill[] = [
+  {
+    name: "breaking-change",
+    type: "rubric",
+    description: `Apply when the diff changes an existing HTTP route or a shared request/response schema. Flag every change that makes a request which used to succeed fail, or removes, renames or retypes something an existing client reads — unless it ships as a new version.`,
+    body: `# Breaking change
+
+A change is breaking when a client built against the previous release, without any
+change on its side, gets an error, loses data, or gets a different meaning. Judge
+from the client's side: compare BEFORE and AFTER of every touched route and schema.
+
+## Breaking (request side)
+- A route is removed, renamed, or its method changes (\`PUT\` → \`PATCH\`).
+- A path param is renamed or changes type (\`:id\` uuid → numeric).
+- A new REQUIRED query/body field, or an optional field becomes required.
+- A field is renamed or changes type; an enum loses a value; a limit gets stricter
+  (\`max(100)\` → \`max(50)\`); a default changes what an omitted field means.
+- Auth or a new header becomes mandatory on an existing route.
+
+## Breaking (response side)
+- A field is removed, renamed (\`user_id\` → \`userId\`) or changes type.
+- A non-null field becomes nullable or optional (clients dereference it).
+- A new enum value appears in a field clients switch on exhaustively.
+- The success status code changes (\`200\` → \`201\`/\`204\`), the list envelope
+  changes (\`T[]\` → \`{ items: T[] }\`), or the error shape changes.
+
+## Compatible (not breaking)
+- A new route; a new OPTIONAL request field with the old behaviour as default.
+- A new response field; a looser input limit; a new optional header.
+
+## Flag when
+A breaking change from the lists above hits a route that existed before the diff
+and there is no new version for it (\`/v2/...\` route, versioned media type) that
+keeps the old contract working. → CRITICAL.
+A change that is breaking only for unusual clients (a new enum value in a field the
+web client renders as text) → WARNING.
+
+## Good
+\`\`\`ts
+// new param is optional and defaults to the old behaviour
+app.get('/repos/:id/pulls', {
+  schema: {
+    params: IdParams,
+    querystring: z.object({
+      state: z.enum(['open', 'closed']).optional(),
+      page: z.coerce.number().int().min(1).default(1),
+    }),
+    response: { 200: PullList },
+  },
+}, handler);
+\`\`\`
+
+## Bad
+\`\`\`ts
+// state became required and page is a new required param:
+// GET /repos/42/pulls (valid yesterday) now answers 400
+app.get('/repos/:id/pulls', {
+  schema: {
+    params: IdParams,
+    querystring: z.object({
+      state: z.enum(['open', 'closed']),
+      page: z.coerce.number().int().min(1),
+    }),
+    response: { 200: PullList },
+  },
+}, handler);
+\`\`\`
+
+## How to report
+Cite the changed schema or route line. State the request or field that breaks,
+e.g. "\`GET /repos/:id/pulls\` without \`state\` now returns 400 — keep \`state\`
+optional or ship the stricter schema as \`/v2\`".`,
+  },
+  {
+    name: "response-schema",
+    type: "convention",
+    description: `Apply when the diff adds or changes a route handler, its reply, or a shared response schema. Flag responses that are not declared per status code, that drift from their Zod schema, leak storage fields, or use a different error shape.`,
+    body: `# Response schema discipline
+
+The response schema IS the contract a client codes against. A route is only as
+stable as the schema it declares and the data it actually sends.
+
+## Rules
+1. Every route declares \`schema.response\` for each status it can send
+   (\`200\`/\`201\`/\`204\` and the 4xx it throws on purpose), using a schema from the
+   shared contracts package — not an inline object, so the client copy matches.
+2. The handler returns exactly that shape. Map storage rows to the contract at the
+   repository/route boundary: \`snake_case\` on the wire, camelCase never leaks.
+3. No internal fields: no \`workspace_id\`, password hashes, tokens, raw vetting
+   payloads or other columns the contract does not list.
+4. Nullability is explicit: \`.nullable()\` for "present but empty",
+   \`.optional()\` only when the key may be absent. Do not switch between them.
+5. Errors use the one error shape \`{ error: { code, message, details? } }\` with a
+   stable machine-readable \`code\`; clients branch on \`code\`, never on \`message\`.
+6. Lists use one envelope consistently within an API area.
+
+## Flag when
+- A new or changed route has no response schema for a status it returns → WARNING.
+- The handler's return value adds, drops or renames a field relative to its
+  declared schema, or returns a storage row as-is → WARNING; CRITICAL when an
+  existing field disappears or an internal/secret field is exposed.
+- A route invents its own error body or reuses a \`code\` for a different meaning
+  → WARNING.
+- A shared schema field flips between nullable and optional → see breaking-change.
+
+## Good
+\`\`\`ts
+// contracts/skills.ts — one schema, shared with the client
+export const SkillRecord = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  agent_count: z.number().int(),
+  vetting: SkillVetting.nullable(),
+});
+
+app.get('/skills/:id', {
+  schema: { params: IdParams, response: { 200: SkillRecord, 404: ApiErrorBody } },
+}, async (req) => toSkillDto(await service.get(req.params.id)));
+\`\`\`
+
+## Bad
+\`\`\`ts
+// no response schema, Drizzle row sent as-is: camelCase keys, workspaceId leaks,
+// and a hand-made error body that no other route uses
+app.get('/skills/:id', async (req, reply) => {
+  const row = await db.select().from(skills).where(eq(skills.id, req.params.id));
+  if (!row[0]) return reply.status(404).send({ message: 'nope' });
+  return row[0];
+});
+\`\`\`
+
+## How to report
+Name the route, the status code and the field that drifts, and the contract schema
+it should use, e.g. "\`GET /skills/:id\` returns the row with \`agentCount\`; map
+through \`toSkillDto\` and declare \`response: { 200: SkillRecord }\`".`,
+  },
+  {
+    name: "semver-discipline",
+    type: "rubric",
+    description: `Apply when the diff changes a public route, a shared contract schema, or a version marker (package version, API version, changelog). Flag contract changes whose version bump does not match their impact, and contract changes with no changelog entry.`,
+    body: `# Semver discipline
+
+The version number is a promise to clients about the size of a change. Decide the
+impact of the contract change first (see breaking-change), then check the bump.
+
+## Expected bump
+- **MAJOR** (or a new \`/vN\` API version): any breaking change to a released route
+  or shared schema — removed/renamed field or route, stricter input, new required
+  field, changed status code or error shape.
+- **MINOR**: a backwards-compatible addition — new route, new optional request
+  field, new response field, new enum value in an input.
+- **PATCH**: a fix that keeps the contract identical — a bug in a handler, a
+  better error message with the same \`code\`, documentation.
+
+## Changelog
+- Every contract change has a changelog entry under the right heading (Added /
+  Changed / Deprecated / Removed / Fixed) that names the route and the field.
+- A breaking change states the migration step for clients in the same entry.
+
+## Flag when
+- A breaking change ships with a MINOR or PATCH bump, or with no bump at all →
+  CRITICAL when the API is released to other consumers, otherwise WARNING.
+- A compatible addition ships as MAJOR (needless churn for clients) → SUGGESTION.
+- The contract changes and the changelog does not mention it → WARNING.
+- The version was bumped but neither the contract nor behaviour changed → SUGGESTION.
+
+## Good
+\`\`\`md
+## 3.0.0
+### Removed
+- \`GET /repos/:id/pulls\`: the deprecated \`author_login\` field (use \`author\`).
+  Clients: read \`author\` — available since 2.4.0.
+\`\`\`
+\`\`\`json
+{ "name": "@acme/payments-api", "version": "3.0.0" }
+\`\`\`
+
+## Bad
+\`\`\`md
+## 2.4.1
+### Fixed
+- Small cleanup in the pulls endpoint.
+\`\`\`
+\`\`\`ts
+// same release: a response field is gone — a breaking change sold as a patch
+export const PullSummary = z.object({ id: z.string(), author: z.string() });
+// before: z.object({ id: z.string(), author: z.string(), author_login: z.string() })
+\`\`\`
+
+## How to report
+Cite the contract line and the version marker. State the impact and the expected
+bump, e.g. "removing \`author_login\` is breaking — release as 3.0.0 (or keep the
+field until then) and list it under Removed".`,
   },
 ];

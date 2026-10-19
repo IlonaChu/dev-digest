@@ -8,15 +8,11 @@ import { ToastProvider } from "@/lib/toast";
 
 const h = vi.hoisted(() => ({
   updateMutate: vi.fn(),
-  createMutate: vi.fn(),
   revetMutate: vi.fn(),
-  replace: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: h.replace }) }));
 vi.mock("@/lib/hooks/skills", () => ({
   useUpdateSkill: () => ({ mutate: h.updateMutate, isPending: false, isSuccess: false, data: undefined }),
-  useCreateSkill: () => ({ mutate: h.createMutate, isPending: false }),
   useRevetSkill: () => ({ mutate: h.revetMutate, isPending: false }),
 }));
 
@@ -36,13 +32,11 @@ const SKILL: Skill = {
 
 beforeEach(() => {
   h.updateMutate.mockClear();
-  h.createMutate.mockClear();
   h.revetMutate.mockClear();
-  h.replace.mockClear();
 });
 afterEach(cleanup);
 
-function renderTab(skill?: Skill) {
+function renderTab(skill: Skill) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ skills: messages, common: commonMessages }}>
       <ToastProvider>
@@ -53,7 +47,7 @@ function renderTab(skill?: Skill) {
 }
 
 const body = () => screen.getByLabelText("Skill body (Markdown)");
-const save = () => screen.getByRole("button", { name: /Save skill|Create skill/ });
+const save = () => screen.getByRole("button", { name: "Save skill" });
 
 describe("skill ConfigTab", () => {
   it("explains that the description is the skill's interface and should be a directive", () => {
@@ -108,22 +102,27 @@ describe("skill ConfigTab", () => {
     expect(h.updateMutate.mock.calls[0]![0]).toEqual({ id: "s1", patch: { body: "new body" } });
   });
 
-  it("creates a new skill from the blank form and opens it", () => {
-    renderTab(undefined);
-    expect(screen.queryByText("Change note")).not.toBeInTheDocument();
+  it("saves the enabled switch on its own, without touching the Save button", () => {
+    renderTab(SKILL);
+    expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("switch"));
+    expect(h.updateMutate).toHaveBeenCalledTimes(1);
+    expect(h.updateMutate.mock.calls[0]![0]).toEqual({ id: "s1", patch: { enabled: false } });
     expect(save()).toBeDisabled();
-    fireEvent.change(screen.getByPlaceholderText("pr-quality-rubric"), { target: { value: "my-skill" } });
-    fireEvent.change(body(), { target: { value: "# Mine" } });
-    fireEvent.click(save());
-    expect(h.createMutate.mock.calls[0]![0]).toEqual({
-      name: "my-skill",
-      description: "",
-      type: "custom",
-      body: "# Mine",
-      enabled: true,
-    });
-    h.createMutate.mock.calls[0]![1].onSuccess({ id: "created1" });
-    expect(h.replace).toHaveBeenCalledWith("/skills/created1?tab=config");
+    expect(screen.queryByText("unsaved")).not.toBeInTheDocument();
+  });
+
+  it("shows the saved enabled state, so a flip from the list card is reflected here", () => {
+    const { rerender } = renderTab(SKILL);
+    rerender(
+      <NextIntlClientProvider locale="en" messages={{ skills: messages, common: commonMessages }}>
+        <ToastProvider>
+          <ConfigTab skill={{ ...SKILL, enabled: false }} />
+        </ToastProvider>
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "false");
+    expect(save()).toBeDisabled();
   });
 
   it("locks the switch and explains why for an imported skill that failed the check", () => {
@@ -135,6 +134,7 @@ describe("skill ConfigTab", () => {
       vetting: { status: "malicious", findings: [], llm: null, version: 1, checked_at: "2026-10-19T10:00:00Z" },
     });
     fireEvent.click(screen.getByRole("switch"));
+    expect(h.updateMutate).not.toHaveBeenCalled();
     expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "false");
     expect(screen.getByText(/Cannot be enabled/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Re-run check" }));

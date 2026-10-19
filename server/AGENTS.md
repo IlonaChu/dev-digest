@@ -41,5 +41,6 @@ pnpm arch:check                                       # layer rules (also run by
 - [specs/review-flow.md](specs/review-flow.md) — touching reviews, `run-executor`, run status, SSE or the pulls routes
 - [specs/L01-run-cost-badge.md](specs/L01-run-cost-badge.md) — touching cost (`cost_usd`) or the PR list rollup
 - [specs/L02-skills.md](specs/L02-skills.md) — touching skills, agent skill links, import/vetting or the prompt skills block
+- [specs/L02-conventions.md](specs/L02-conventions.md) — touching conventions extraction (candidates, evidence check, the merged skill)
 - [README.md](README.md) (API map, env) · [INSIGHTS.md](INSIGHTS.md) · [docs/](docs/README.md) · [specs/](specs/README.md)
 Skills: onion-architecture · fastify-best-practices · drizzle-orm-patterns · postgresql-table-design

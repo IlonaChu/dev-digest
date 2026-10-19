@@ -6,8 +6,9 @@ import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
 import * as t from '../src/db/schema.js';
-import { MockGitClient, MockLLMProvider, MockEmbedder } from '../src/adapters/mocks.js';
-import type { Skill, SkillImportPreview, SkillVersion } from '@devdigest/shared';
+import { MockGitClient, MockLLMProvider, MockEmbedder, MockUrlFetcher } from '../src/adapters/mocks.js';
+import type { ContainerOverrides } from '../src/platform/container.js';
+import type { Skill, SkillImportFile, SkillImportPreview, SkillVersion } from '@devdigest/shared';
 
 const hasDocker = await dockerAvailable();
 const d = hasDocker ? describe : describe.skip;
@@ -38,14 +39,14 @@ d('skills routes (Testcontainers pg)', () => {
   });
 
   // Vetting resolves the `skill_vetting` feature model (openrouter by default).
-  async function makeApp(verdict: Verdict = 'clean') {
+  async function makeApp(verdict: Verdict = 'clean', extra: Partial<ContainerOverrides> = {}) {
     const llm = new MockLLMProvider('openai', {
       structured: { verdict, reasons: verdict === 'clean' ? [] : ['looks like an instruction override'] },
     });
     const app = await buildApp({
       config: loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv),
       db: pg.handle.db,
-      overrides: { embedder: new MockEmbedder(), git: new MockGitClient(), llm: { openrouter: llm } },
+      overrides: { embedder: new MockEmbedder(), git: new MockGitClient(), llm: { openrouter: llm }, ...extra },
     });
     return { app, llm, vetCalls: () => llm.calls.filter((c) => c.method === 'completeStructured').length };
   }
@@ -146,6 +147,44 @@ d('skills routes (Testcontainers pg)', () => {
     expect(saved.enabled).toBe(false);
     expect(saved.source).toBe('imported');
     expect(saved.body).not.toContain('curl');
+    await app.close();
+  });
+
+  it('URL import: the server downloads the file, then preview/import run as for an upload', async () => {
+    const name = uniq('remote');
+    const raw = 'https://raw.githubusercontent.com/acme/skills/main/SKILL.md';
+    const { app } = await makeApp('clean', { urlFetcher: new MockUrlFetcher({ [raw]: mdFile(name) }) });
+    const before = await countSkills();
+
+    const fetched = await app.inject({
+      method: 'POST',
+      url: '/skills/import/fetch',
+      payload: { url: 'https://github.com/acme/skills/blob/main/SKILL.md' },
+    });
+    expect(fetched.statusCode).toBe(200);
+    const file = fetched.json() as SkillImportFile;
+    expect(file).toEqual({ filename: 'SKILL.md', content_base64: b64(mdFile(name)), source_url: raw });
+    expect(await countSkills()).toBe(before); // nothing stored by the download
+
+    const preview = await app.inject({
+      method: 'POST',
+      url: '/skills/import/preview',
+      payload: { filename: file.filename, content_base64: file.content_base64 },
+    });
+    expect((preview.json() as SkillImportPreview).vetting.status).toBe('clean');
+
+    const save = await app.inject({ method: 'POST', url: '/skills/import', payload: file });
+    expect(save.statusCode).toBe(201);
+    const saved = save.json() as Skill;
+    expect(saved).toMatchObject({ source: 'imported_url', enabled: false });
+    const on = await app.inject({ method: 'PUT', url: `/skills/${saved.id}`, payload: { enabled: true } });
+    expect((on.json() as Skill).enabled).toBe(true); // clean → the vetting policy allows it
+
+    const bad = await app.inject({ method: 'POST', url: '/skills/import/fetch', payload: { url: 'ftp://acme.example/SKILL.md' } });
+    expect(bad.statusCode).toBe(422);
+    const missing = await app.inject({ method: 'POST', url: '/skills/import/fetch', payload: { url: 'https://acme.example/nope.md' } });
+    expect(missing.statusCode).toBe(422);
+    expect(JSON.stringify(missing.json())).toContain('skill_fetch_failed');
     await app.close();
   });
 

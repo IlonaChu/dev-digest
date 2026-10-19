@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import messages from "../../../../../../../../../messages/en/skills.json";
+import messages from "../../../messages/en/skills.json";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { estimateTokens, highlightLines, lineCount } from "./helpers";
 

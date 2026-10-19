@@ -46,8 +46,8 @@ export interface MockLLMOptions {
   /** Fixture returned by completeStructured (validated against the schema). */
   structured?: unknown;
   /**
-   * Per-schemaName fixtures for multi-call flows (e.g. the conventions 2-step
-   * dialogue: 'ConventionFileSelection' then 'ConventionExtraction'). Looked up
+   * Per-schemaName fixtures for multi-call flows (e.g. 'ConventionExtraction' for
+   * the conventions extractor). Looked up
    * by req.schemaName; falls back to `structured` when no entry matches.
    */
   structuredBySchema?: Record<string, unknown>;
@@ -326,5 +326,32 @@ export class MockSecretsProvider implements SecretsProvider {
   constructor(private secrets: Partial<Record<string, string>> = {}) {}
   async get(key: SecretKey): Promise<string | undefined> {
     return this.secrets[key as string];
+  }
+}
+
+// ---------- Mock URL fetcher (skill import) ----------
+export interface MockFetchedFile {
+  bytes: Uint8Array;
+  contentType?: string | null;
+  finalUrl?: string;
+}
+
+/**
+ * Serves fixed bytes per URL; an unknown URL fails like a 404. Mirrors the
+ * `UrlFetcher` port of modules/skills/ports.ts — no network.
+ */
+export class MockUrlFetcher {
+  calls: { url: string; maxBytes: number; timeoutMs: number }[] = [];
+  constructor(private files: Record<string, MockFetchedFile | string> = {}) {}
+
+  async fetchBytes(url: string, limits: { maxBytes: number; timeoutMs: number }) {
+    this.calls.push({ url, ...limits });
+    const entry = this.files[url];
+    if (entry === undefined) throw new Error('HTTP 404');
+    const file = typeof entry === 'string' ? { bytes: new TextEncoder().encode(entry) } : entry;
+    if (file.bytes.byteLength > limits.maxBytes) {
+      throw new Error(`the file is larger than ${limits.maxBytes} bytes`);
+    }
+    return { bytes: file.bytes, contentType: file.contentType ?? 'text/plain', finalUrl: file.finalUrl ?? url };
   }
 }

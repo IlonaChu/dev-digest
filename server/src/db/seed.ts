@@ -8,6 +8,9 @@ import {
   PERFORMANCE_REVIEWER_PROMPT,
   TEST_QUALITY_REVIEWER_PROMPT,
   TEST_QUALITY_SKILLS,
+  API_CONTRACT_REVIEWER_PROMPT,
+  API_CONTRACT_SKILLS,
+  type SeedSkill,
 } from './seed-prompts.js';
 
 /** Default provider/model for the built-in reviewer agents. */
@@ -20,9 +23,10 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the four built-in agents (General + Security +
- * Performance + Test Quality), all on the default openrouter/deepseek-v4-flash
- * provider+model, plus the Test Quality Reviewer's four skills linked in order.
+ * with a few findings, and the five built-in agents (General + Security +
+ * Performance + Test Quality + API Contract), all on the default
+ * openrouter/deepseek-v4-flash provider+model, plus the Test Quality Reviewer's
+ * four skills and the API Contract Reviewer's three seeded skills, linked in order.
  *
  * Course lessons populate the other tables (skills, conventions, memory, eval,
  * …) once their features are built — they start empty here.
@@ -225,6 +229,17 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'API Contract Reviewer',
+      description: 'Checks the HTTP API contract: breaking changes, response schemas, versioning, deprecation.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: API_CONTRACT_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   const createdAgentNames = new Set<string>();
   for (const a of seedAgents) {
@@ -238,15 +253,33 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     }
   }
 
-  // ---- Test Quality Reviewer's skills (own text → source 'manual', no vetting) ----
+  // ---- built-in agents' skills (own text → source 'manual', no vetting) ----
   // A skill is created once (v1 + its snapshot). It is linked to the agent, in
   // list order, only when the skill or the agent is new in this run — so a link
   // the user removed in the UI is not silently restored by a re-seed.
-  const [tqAgent] = await db
+  const seedSkillSets: Array<[agentName: string, skills: SeedSkill[]]> = [
+    ['Test Quality Reviewer', TEST_QUALITY_SKILLS],
+    ['API Contract Reviewer', API_CONTRACT_SKILLS],
+  ];
+  for (const [agentName, skills] of seedSkillSets) {
+    await seedAgentSkills(db, workspaceId, agentName, skills, createdAgentNames.has(agentName));
+  }
+
+  return { workspaceId, userId };
+}
+
+async function seedAgentSkills(
+  db: Db,
+  workspaceId: string,
+  agentName: string,
+  skills: SeedSkill[],
+  agentCreated: boolean,
+): Promise<void> {
+  const [agent] = await db
     .select()
     .from(t.agents)
-    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'Test Quality Reviewer')));
-  for (const [order, sk] of TEST_QUALITY_SKILLS.entries()) {
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, agentName)));
+  for (const [order, sk] of skills.entries()) {
     let [skill] = await db
       .select()
       .from(t.skills)
@@ -281,15 +314,13 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
           .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, sk.name)));
       }
     }
-    if (tqAgent && skill && (createdSkill || createdAgentNames.has('Test Quality Reviewer'))) {
+    if (agent && skill && (createdSkill || agentCreated)) {
       await db
         .insert(t.agentSkills)
-        .values({ agentId: tqAgent.id, skillId: skill.id, order })
+        .values({ agentId: agent.id, skillId: skill.id, order })
         .onConflictDoNothing();
     }
   }
-
-  return { workspaceId, userId };
 }
 
 // CLI entrypoint

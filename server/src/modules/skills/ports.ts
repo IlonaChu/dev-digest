@@ -24,3 +24,21 @@ export interface ArchiveReader {
   /** UTF-8 text of one entry. Throws if the real size exceeds `maxBytes`. */
   readText(archive: Uint8Array, path: string, maxBytes: number): string;
 }
+
+/** Bytes of one remote file, as downloaded for a URL import. */
+export interface FetchedFile {
+  bytes: Uint8Array;
+  /** `content-type` response header, if any. */
+  contentType: string | null;
+  /** URL after redirects — names the file when the user's link has no extension. */
+  finalUrl: string;
+}
+
+/**
+ * Downloads ONE public http(s) URL for a skill import. The body is capped at
+ * `maxBytes` and the request at `timeoutMs`; nothing is written to disk and the
+ * result goes through the same parser + vetting as an uploaded file.
+ */
+export interface UrlFetcher {
+  fetchBytes(url: string, limits: { maxBytes: number; timeoutMs: number }): Promise<FetchedFile>;
+}

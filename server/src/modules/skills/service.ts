@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type {
+  SkillImportFile,
   Skill,
   SkillImportPreview,
   SkillType,
@@ -9,9 +10,11 @@ import type {
 import type { Container } from '../../platform/container.js';
 import { AppError, ValidationError } from '../../platform/errors.js';
 import { enableBlockReason, requiresVetting } from '../_shared/skill-policy.js';
-import { INITIAL_SKILL_VERSION, MAX_ARCHIVE_BYTES, VETTING_CACHE_TTL_MS } from './constants.js';
+import { FETCH_TIMEOUT_MS, INITIAL_SKILL_VERSION, MAX_ARCHIVE_BYTES, VETTING_CACHE_TTL_MS } from './constants.js';
 import { isContentChange, toSkillDto, toSkillVersionDto } from './helpers.js';
 import { parseSkillImport, toSkillName } from './import-parser.js';
+import { filenameFromUrl, normalizeSkillUrl } from './import-url.js';
+import type { FetchedFile } from './ports.js';
 import type { SkillRow, SkillsRepository } from './repository.js';
 import { vetContent, type VettingContent } from './vetting/vet.js';
 
@@ -36,6 +39,8 @@ export interface ImportOverrides {
   name?: string;
   description?: string;
   type?: SkillType;
+  /** Set when the file came from `fetchImport` — the skill is stored as `imported_url`. */
+  source_url?: string;
 }
 
 /**
@@ -148,8 +153,39 @@ export class SkillsService {
   }
 
   /**
+   * Download a skill file from a public URL so the import flow can treat it like
+   * an upload: the result is the `{filename, content_base64}` payload of
+   * `previewImport` / `importSkill`. Stores NOTHING. A download that is not a
+   * skill file at all (binary, no content) fails here, not on the preview.
+   */
+  async fetchImport(url: string): Promise<SkillImportFile> {
+    const sourceUrl = normalizeSkillUrl(url);
+    let fetched: FetchedFile;
+    try {
+      fetched = await this.container.urlFetcher.fetchBytes(sourceUrl, {
+        maxBytes: MAX_ARCHIVE_BYTES,
+        timeoutMs: FETCH_TIMEOUT_MS,
+      });
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      throw new AppError('skill_fetch_failed', `Could not fetch the skill file (${why})`, 422, {
+        url: sourceUrl,
+      });
+    }
+    if (fetched.bytes.byteLength === 0) throw new ValidationError('The fetched file is empty');
+    const filename = filenameFromUrl(fetched.finalUrl || sourceUrl, fetched.contentType);
+    parseSkillImport(filename, fetched.bytes, this.container.archive);
+    return {
+      filename,
+      content_base64: Buffer.from(fetched.bytes).toString('base64'),
+      source_url: sourceUrl,
+    };
+  }
+
+  /**
    * Confirm an import. The server re-parses the file itself (the client only
    * supplies optional edits) and stores the skill DISABLED with its vetting.
+   * A file that came through `fetchImport` is marked `imported_url`.
    */
   async importSkill(
     workspaceId: string,
@@ -173,7 +209,7 @@ export class SkillsService {
       name: final.name,
       description: final.description,
       type: final.type,
-      source: 'imported',
+      source: overrides.source_url ? 'imported_url' : 'imported',
       body: final.body,
       enabled: false,
       vetting: this.stamp(result, INITIAL_SKILL_VERSION),

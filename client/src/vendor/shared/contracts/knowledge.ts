@@ -205,16 +205,17 @@ export const SkillImportPreview = z.object({
 });
 export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
 
-// ---- Conventions ----
-export const ConventionCandidate = z.object({
-  id: z.string(),
-  rule: z.string(),
-  evidence_path: z.string(),
-  evidence_snippet: z.string(),
-  confidence: z.number().min(0).max(1),
-  accepted: z.boolean(),
+/**
+ * A skill file the server downloaded from a URL — the same payload the file
+ * import takes, so preview/confirm run unchanged. Nothing is stored.
+ */
+export const SkillImportFile = z.object({
+  filename: z.string(),
+  content_base64: z.string(),
+  /** The URL that was fetched (a GitHub file page is rewritten to its raw file). */
+  source_url: z.string(),
 });
-export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+export type SkillImportFile = z.infer<typeof SkillImportFile>;
 
 // ---- Agents ----
 // 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a

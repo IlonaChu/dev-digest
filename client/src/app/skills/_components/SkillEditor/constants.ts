@@ -1,14 +1,16 @@
+import type { IconName } from "@devdigest/ui";
 import type { SkillTab } from "../../constants";
 
 /** Editor tab descriptor. `labelKey` resolves under the `skills` namespace. */
 export interface EditorTab {
   key: SkillTab;
   labelKey: string;
+  icon: IconName;
 }
 
-/** Tabs of a saved skill. A new skill only offers `config` (nothing to preview or version yet). */
+/** Editor tabs, in display order. */
 export const TABS: readonly EditorTab[] = [
-  { key: "config", labelKey: "editor.tabs.config" },
-  { key: "preview", labelKey: "editor.tabs.preview" },
-  { key: "versions", labelKey: "editor.tabs.versions" },
+  { key: "config", labelKey: "editor.tabs.config", icon: "Settings" },
+  { key: "preview", labelKey: "editor.tabs.preview", icon: "Eye" },
+  { key: "versions", labelKey: "editor.tabs.versions", icon: "Clock" },
 ];

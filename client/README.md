@@ -29,12 +29,14 @@ flowchart TD
 
   AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills)"]
   SKILLS["/skills"] --> SKILL["/skills/:id<br/>editor (config · preview · versions)"]
+  CONV["/repos/:repoId/conventions<br/>candidates · create skill"]
   SETTINGS["/settings/:section<br/>API keys · models"]
 
   PULLS -->|"GET /repos/:id/pulls · /repos/:id/index-state"| API
   PR -->|"GET /pulls/:id · /reviews · /pulls/:id/comments<br/>POST /pulls/:id/review · /findings/:id/(accept|dismiss)"| API
   AGENTS -->|"/agents · /agents/:id · /agents/:id/skills"| API
-  SKILLS -->|"/skills · /skills/:id · /skills/import"| API
+  SKILLS -->|"/skills · /skills/:id · /skills/import(/fetch)"| API
+  CONV -->|"/repos/:id/conventions(/extract|/status|/skill-draft|/skill) · /conventions/:id"| API
   SETTINGS -->|"/settings · /providers"| API
 ```
 

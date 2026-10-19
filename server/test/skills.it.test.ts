@@ -28,6 +28,7 @@ const DIFF = `diff --git a/src/config.ts b/src/config.ts
 const APPROVE: Review = { verdict: 'approve', summary: 'ok', score: 100, findings: [] };
 
 const TQ_SKILLS = ['untested-branches', 'edge-case-checklist', 'mock-discipline', 'flaky-test-patterns'];
+const API_SKILLS = ['breaking-change', 'response-schema', 'semver-discipline'];
 
 type Db = PgFixture['handle']['db'];
 
@@ -422,6 +423,40 @@ d('skills ↔ agents (Testcontainers pg)', () => {
     expect(pos.every((p) => p >= 0)).toBe(true);
     expect([...pos].sort((x, y) => x - y)).toEqual(pos);
     expect((trace.prompt_assembly.skills_meta as { name: string }[]).map((m) => m.name)).toEqual(TQ_SKILLS);
+    await app.close();
+  });
+
+  it('the seeded API Contract Reviewer links its 3 skills and injects them in order', async () => {
+    const db: Db = pg.handle.db;
+    const [api] = await db
+      .select()
+      .from(t.agents)
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'API Contract Reviewer')));
+    expect(api).toBeDefined();
+    await db.update(t.agents).set({ provider: 'openai', model: 'gpt-4.1' }).where(eq(t.agents.id, api!.id));
+
+    const { app, llm } = await makeApp();
+    const ls = await links(app, api!.id);
+    const skillRows = await db.select().from(t.skills).where(eq(t.skills.workspaceId, workspaceId));
+    const byId = new Map(skillRows.map((s) => [s.id, s]));
+    expect(ls.map((l) => byId.get(l.skill_id)!.name)).toEqual(API_SKILLS);
+    expect(ls.map((l) => l.order)).toEqual([0, 1, 2]);
+    for (const l of ls) {
+      const s = byId.get(l.skill_id)!;
+      expect(s.source).toBe('manual');
+      expect(s.description).toMatch(/^Apply when/);
+      expect(s.body).toContain('## Good');
+      expect(s.body).toContain('## Bad');
+    }
+    // deprecation-policy ships as an import file, not as a seeded skill
+    expect(skillRows.some((s) => s.name === 'deprecation-policy')).toBe(false);
+
+    const { trace } = await runReview(app, api!.id);
+    const prompt = userPrompt(llm);
+    const pos = API_SKILLS.map((n) => prompt.indexOf(`### Skill: ${n} (v1)`));
+    expect(pos.every((p) => p >= 0)).toBe(true);
+    expect([...pos].sort((x, y) => x - y)).toEqual(pos);
+    expect((trace.prompt_assembly.skills_meta as { name: string }[]).map((m) => m.name)).toEqual(API_SKILLS);
     await app.close();
   });
 });

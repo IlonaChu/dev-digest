@@ -29,8 +29,10 @@ import { PullsRepository } from '../modules/pulls/repository.js';
 import { RepoRepository } from '../modules/repos/repository.js';
 import { SkillsRepository } from '../modules/skills/repository.js';
 import { SettingsRepository } from '../modules/settings/repository.js';
-import type { ArchiveReader } from '../modules/skills/ports.js';
+import { ConventionsRepository } from '../modules/conventions/repository.js';
+import type { ArchiveReader, UrlFetcher } from '../modules/skills/ports.js';
 import { FflateArchiveReader } from '../adapters/archive/fflate.js';
+import { FetchUrlFetcher } from '../adapters/http/url-fetcher.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import type { CodeParser, SourceTree, Tokenizer } from '../modules/repo-intel/ports.js';
@@ -64,6 +66,8 @@ export interface ContainerOverrides {
   codeParser?: CodeParser;
   /** Zip reader for skill import — tests inject a fake. */
   archive?: ArchiveReader;
+  /** Downloader for skill import from a URL — tests inject a fake (no network). */
+  urlFetcher?: UrlFetcher;
 }
 
 export class Container {
@@ -89,7 +93,9 @@ export class Container {
   private _reposRepo?: RepoRepository;
   private _skillsRepo?: SkillsRepository;
   private _settingsRepo?: SettingsRepository;
+  private _conventionsRepo?: ConventionsRepository;
   private _archive?: ArchiveReader;
+  private _urlFetcher?: UrlFetcher;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -136,11 +142,22 @@ export class Container {
     return (this._settingsRepo ??= new SettingsRepository(this.db));
   }
 
+  get conventionsRepo(): ConventionsRepository {
+    return (this._conventionsRepo ??= new ConventionsRepository(this.db));
+  }
+
   /** Read-only zip access for skill import (lists entries, reads one text file). */
   get archive(): ArchiveReader {
     if (this.overrides.archive) return this.overrides.archive;
     this._archive ??= new FflateArchiveReader();
     return this._archive;
+  }
+
+  /** One-shot downloader for `POST /skills/import/fetch` (size- and time-capped). */
+  get urlFetcher(): UrlFetcher {
+    if (this.overrides.urlFetcher) return this.overrides.urlFetcher;
+    this._urlFetcher ??= new FetchUrlFetcher();
+    return this._urlFetcher;
   }
 
   get codeIndex(): CodeIndex {

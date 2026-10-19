@@ -32,5 +32,6 @@ pnpm test         # vitest + jsdom + React Testing Library; fetch is mocked
 - [specs/pages.md](specs/pages.md) — changing any page's behaviour
 - [specs/L01-run-cost-badge.md](specs/L01-run-cost-badge.md) — touching cost display
 - [specs/L02-skills.md](specs/L02-skills.md) — touching the Skills pages, the agent Skills tab or the trace skills block
+- [specs/L02-conventions.md](specs/L02-conventions.md) — touching conventions extraction (candidates, evidence check, the merged skill)
 - [README.md](README.md) (route map) · [docs/](docs/README.md) · [specs/](specs/README.md) · [INSIGHTS.md](INSIGHTS.md)
 Skills: frontend-architecture (where code goes) · next-best-practices · react-best-practices · react-testing-library

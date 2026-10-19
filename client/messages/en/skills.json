@@ -1,5 +1,7 @@
 {
-  "meta": { "title": "Skills" },
+  "meta": {
+    "title": "Skills"
+  },
   "page": {
     "crumbLab": "Skills Lab",
     "crumbSkills": "Skills",
@@ -8,27 +10,53 @@
     "addSkill": "Add Skill",
     "searchPlaceholder": "Search skills…",
     "loadError": "Could not load skills.",
-    "menu": {
-      "create": "Create a skill",
-      "import": "Import from file"
-    },
     "empty": {
       "title": "No skills yet",
-      "body": "Write a skill, or import a .md file or a .zip archive.",
+      "body": "Write a skill, import a .md file or a .zip archive, or fetch one from a URL.",
       "cta": "Create a skill"
+    },
+    "placeholder": {
+      "title": "Select a skill",
+      "body": "Pick a skill on the left to open it in the editor."
     }
+  },
+  "add": {
+    "title": "Add skill",
+    "tabs": {
+      "create": "Create",
+      "file": "From file",
+      "url": "Import from URL"
+    },
+    "body": "Body (Markdown)",
+    "bodyPlaceholder": "# Rule Describe the rule…",
+    "submit": "Create skill",
+    "createdToast": "Skill created",
+    "url": "URL",
+    "urlPlaceholder": "https://github.com/org/repo/blob/main/SKILL.md",
+    "urlHint": "A public link to a .md file or a .zip archive, up to 1 MB. GitHub file pages are fetched as raw files.",
+    "fetch": "Fetch",
+    "fetching": "Fetching…",
+    "fetchError": "Could not fetch the file",
+    "anotherUrl": "Use another URL"
   },
   "card": {
     "agents": "{count, plural, one {# agent} other {# agents}}",
     "blockedToggle": "Blocked — this imported skill did not pass the safety check, so it cannot be enabled.",
     "noDescription": "No description",
-    "delete": "Delete skill"
+    "delete": "Delete skill",
+    "meta": "{source} · v{version}"
   },
   "type": {
     "rubric": "rubric",
     "convention": "convention",
     "security": "security",
     "custom": "custom"
+  },
+  "typeLabel": {
+    "rubric": "Rubric",
+    "convention": "Convention",
+    "security": "Security",
+    "custom": "Custom"
   },
   "source": {
     "manual": "Manual",
@@ -62,16 +90,11 @@
     "rerunDone": "Safety check finished: {status}"
   },
   "preview": {
-    "enabled": "Enabled",
     "disabled": "Disabled",
-    "openEditor": "Open editor",
-    "version": "v{version}",
-    "agents": "Used by {count, plural, one {# agent} other {# agents}}",
-    "close": "Close"
+    "version": "v{version}"
   },
   "import": {
-    "title": "Import a skill",
-    "subtitle": "Upload a .md file or a .zip archive. You review the result before anything is saved.",
+    "intro": "Upload a .md file or a .zip archive. You review the result before anything is saved.",
     "pick": "Choose a file",
     "pickHint": ".md or .zip, up to 1 MB",
     "reading": "Reading and checking the file…",
@@ -94,7 +117,6 @@
     "trustTitle": "Someone else's instructions",
     "trustWarning": "An imported skill is someone else's instructions that will sit inside your agent's prompt. It is saved disabled, and it can be enabled only if it passes the safety check.",
     "confirm": "I reviewed the text above and want to save it as a disabled skill",
-    "cancel": "Cancel",
     "save": "Save (disabled by default)",
     "saving": "Saving…",
     "savedToast": "Imported \"{name}\". It is disabled until the safety check allows enabling it.",
@@ -102,7 +124,6 @@
   },
   "editor": {
     "crumbSkill": "Skill",
-    "newTitle": "New skill",
     "loadErrorTitle": "Couldn’t load this skill",
     "loadErrorBody": "The skill could not be loaded. It may have been deleted.",
     "listTitle": "Skills",
@@ -133,11 +154,9 @@
     "changeNoteHint": "Optional. Shown in the version history.",
     "changeNotePlaceholder": "Tightened the scope rule",
     "save": "Save skill",
-    "create": "Create skill",
     "saving": "Saving…",
     "saved": "Saved (v{version})",
-    "savedToast": "Skill saved (v{version})",
-    "createdToast": "Skill created"
+    "savedToast": "Skill saved (v{version})"
   },
   "bodyEditor": {
     "unsaved": "unsaved",
@@ -154,15 +173,14 @@
   "versions": {
     "title": "Version history",
     "count": "{count, plural, one {# version} other {# versions}}",
-    "hint": "Every save of the text or description snapshots it, so past runs stay reproducible.",
+    "hint": "Every save snapshots the body so eval runs stay reproducible against the exact text they scored.",
     "current": "Current",
-    "noNote": "No change note",
     "diff": "Diff",
+    "hide": "Hide",
     "restore": "Restore",
     "restoreConfirm": "Restore v{version}? This saves a new version with that text.",
     "restoredToast": "Restored v{version} as a new version",
     "empty": "No versions yet.",
-    "diffTitle": "v{version} → current",
     "diffSame": "Identical to the current text.",
     "diffDescription": "Description"
   },

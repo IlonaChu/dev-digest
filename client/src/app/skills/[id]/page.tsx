@@ -19,7 +19,7 @@ export default function SkillEditorPage() {
   const router = useRouter();
   const { data: skill, isLoading, isError, error, refetch } = useSkill(id);
 
-  const tab = parseSkillTab(search.get("tab"), true);
+  const tab = parseSkillTab(search.get("tab"));
   const setTab = (next: SkillTab) => {
     const sp = new URLSearchParams(search.toString());
     sp.set("tab", next);
@@ -47,7 +47,7 @@ export default function SkillEditorPage() {
 
   return (
     <AppShell crumb={crumb}>
-      <SkillWorkspace skill={skill} loading={isLoading || !skill} tab={tab} onTab={setTab} />
+      <SkillWorkspace skill={skill} tab={tab} onTab={setTab} />
     </AppShell>
   );
 }

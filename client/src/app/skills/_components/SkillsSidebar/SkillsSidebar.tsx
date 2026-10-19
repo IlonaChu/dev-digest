@@ -1,5 +1,6 @@
-/* SkillsSidebar — the left column of the skill editor: Add Skill ▾, search and the
-   skill cards (active one highlighted). Selecting a card keeps the current tab. */
+/* SkillsSidebar — the left column of /skills and the skill editor: Add Skill
+   (opens the Add skill dialog), search and the skill cards (active one
+   highlighted). Clicking a card opens its editor on the Config tab. */
 "use client";
 
 import React from "react";
@@ -13,7 +14,7 @@ import { filterSkills } from "../../helpers";
 import { useDeleteSkillAction } from "../../_lib/useDeleteSkillAction";
 import { s } from "./styles";
 
-export function SkillsSidebar({ activeId, tab }: { activeId?: string; tab: string }) {
+export function SkillsSidebar({ activeId }: { activeId?: string }) {
   const t = useTranslations("skills");
   const router = useRouter();
   const { data: skills, isLoading } = useSkills();
@@ -27,7 +28,7 @@ export function SkillsSidebar({ activeId, tab }: { activeId?: string; tab: strin
       <div style={s.head}>
         <div style={s.titleRow}>
           <h1 style={s.title}>{t("editor.listTitle")}</h1>
-          <AddSkillButton width={210} />
+          <AddSkillButton />
         </div>
         <div style={s.search}>
           <Icon.Search size={13} style={s.searchIcon} />
@@ -41,13 +42,19 @@ export function SkillsSidebar({ activeId, tab }: { activeId?: string; tab: strin
         </div>
       </div>
       <div style={s.list}>
-        {isLoading && <Skeleton height={110} />}
+        {isLoading && (
+          <>
+            <Skeleton height={110} />
+            <Skeleton height={110} />
+            <Skeleton height={110} />
+          </>
+        )}
         {list.map((sk) => (
           <SkillCard
             key={sk.id}
             skill={sk}
             active={sk.id === activeId}
-            onClick={() => router.push(`/skills/${sk.id}?tab=${tab}`)}
+            onClick={() => router.push(`/skills/${sk.id}?tab=config`)}
             onToggle={(enabled) => update.mutate({ id: sk.id, patch: { enabled } })}
             onDelete={() => remove(sk)}
             deleting={isPending}

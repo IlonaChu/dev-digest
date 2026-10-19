@@ -11,6 +11,10 @@ export const MAX_SKILL_MD_BYTES = 256 * 1024;
 /** Import routes carry the file as base64 JSON (1 MiB zip ≈ 1.4 MiB encoded). */
 export const IMPORT_BODY_LIMIT = 2 * 1024 * 1024;
 
+/** URL import: one download, cut after this long; the size cap is MAX_ARCHIVE_BYTES. */
+export const FETCH_TIMEOUT_MS = 15_000;
+export const MAX_URL_LENGTH = 2048;
+
 export const MAX_SKILL_NAME_LENGTH = 64;
 export const MAX_DESCRIPTION_LENGTH = 500;
 

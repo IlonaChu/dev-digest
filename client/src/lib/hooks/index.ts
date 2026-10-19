@@ -57,6 +57,7 @@ export {
   useRevetSkill,
   useImportSkillPreview,
   useImportSkill,
+  useFetchSkillFromUrl,
   useSetAgentSkills,
   type CreateSkillInput,
   type UpdateSkillInput,
@@ -85,6 +86,19 @@ export {
   type CreateCommentInput,
   type RunReviewInput,
 } from "./reviews";
+export {
+  conventionKeys,
+  conventionsQuery,
+  useRejectConvention,
+  useConventions,
+  useExtractConventions,
+  useUpdateConvention,
+  useSetAllConventions,
+  useConventionSkillDraft,
+  useCreateConventionSkill,
+  type UpdateConventionInput,
+  type CreateConventionSkillInput,
+} from "./conventions";
 export { traceKeys, runTraceQuery, useRunTrace } from "./trace";
 export {
   repoIntelKeys,

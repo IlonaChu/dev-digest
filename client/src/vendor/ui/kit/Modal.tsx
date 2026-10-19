@@ -8,6 +8,7 @@ export function Modal({
   onClose,
   children,
   footer,
+  tabs,
 }: {
   width?: number;
   title?: React.ReactNode;
@@ -15,6 +16,8 @@ export function Modal({
   onClose?: () => void;
   children?: React.ReactNode;
   footer?: React.ReactNode;
+  /** Tab bar rendered under the title, inside the header. It draws its own (inset) divider. */
+  tabs?: React.ReactNode;
 }) {
   return (
     <div style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", zIndex: 50, padding: 28 }}>
@@ -42,20 +45,20 @@ export function Modal({
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 14,
-            padding: "18px 24px",
-            borderBottom: "1px solid var(--border)",
+            padding: tabs ? "18px 24px 0" : "18px 24px",
+            borderBottom: tabs ? "none" : "1px solid var(--border)",
           }}
         >
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
-            {subtitle && (
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>{subtitle}</div>
-            )}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
+              {subtitle && (
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>{subtitle}</div>
+              )}
+            </div>
+            {onClose && <IconBtn icon="X" label="Close" onClick={onClose} />}
           </div>
-          {onClose && <IconBtn icon="X" label="Close" onClick={onClose} />}
+          {tabs}
         </div>
         <div style={{ flex: 1, overflow: "auto" }}>{children}</div>
         {footer && (
