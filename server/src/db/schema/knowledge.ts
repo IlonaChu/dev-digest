@@ -66,7 +66,11 @@ export const conventionScans = pgTable(
     costUsd: doublePrecision('cost_usd'),
     createdAt: now(),
   },
-  (t) => ({ repoIdx: index('convention_scans_repo_idx').on(t.repoId, t.createdAt) }),
+  (t) => ({
+    repoIdx: index('convention_scans_repo_idx').on(t.repoId, t.createdAt),
+    // FK lookups when a workspace is deleted (cascade).
+    workspaceIdx: index('convention_scans_workspace_idx').on(t.workspaceId),
+  }),
 );
 
 /** A rule found in the repo plus the evidence the server verified for it. */
@@ -98,8 +102,10 @@ export const conventions = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
+    // Its leading `repo_id` also serves every per-repo read, so no separate repo index.
     ruleUq: uniqueIndex('conventions_repo_rule_uq').on(t.repoId, t.evidencePath, t.ruleKey),
-    repoIdx: index('conventions_repo_idx').on(t.repoId),
+    // FK lookups when a scan is deleted (`scan_id` is set null).
+    scanIdx: index('conventions_scan_idx').on(t.scanId),
     statusCheck: check('conventions_status_check', sql`${t.status} in ('pending','accepted','rejected')`),
   }),
 );

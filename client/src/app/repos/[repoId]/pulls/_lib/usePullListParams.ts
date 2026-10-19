@@ -20,6 +20,15 @@ export function usePullListParams() {
   const status = rawStatus && STATUS_KEYS.has(rawStatus) ? rawStatus : DEFAULT_STATUS;
   const sort: PullSort = PULL_SORTS.includes(rawSort as PullSort) ? (rawSort as PullSort) : "newest";
   const [query, setDraft] = React.useState(() => search.get("q") ?? "");
+  const urlKey = search.toString();
+
+  // A navigation that only changes the search params (sidebar link, `g p`) keeps this page
+  // mounted, so re-read ?q when the URL changes. The live location, not `search`, is the
+  // source: it already holds every keystroke this hook wrote, while `search` may still lag.
+  React.useEffect(() => {
+    const live = new URLSearchParams(window.location.search).get("q") ?? "";
+    setDraft((d) => (d === live ? d : live));
+  }, [urlKey]);
 
   // Built from the live location, not the render-time `search`, so a write made while an
   // earlier one is still syncing doesn't drop it.

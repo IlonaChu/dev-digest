@@ -55,7 +55,12 @@ export function CreateSkillModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  const nameTaken = create.error instanceof ApiError && create.error.code === NAME_TAKEN_CODE;
+  const nameErrorId = React.useId();
+  // Only while the name on screen is the one the server refused; renaming clears the error.
+  const nameTaken =
+    create.error instanceof ApiError &&
+    create.error.code === NAME_TAKEN_CODE &&
+    create.variables?.name === form.name.trim();
 
   const submit = async () => {
     const { skill_id } = await create.mutateAsync({
@@ -115,9 +120,16 @@ export function CreateSkillModal({
         </div>
 
         <FormField label={t("modal.name")} required>
-          <TextInput value={form.name} onChange={(v) => set("name", v)} mono aria-label={t("modal.name")} />
+          <TextInput
+            value={form.name}
+            onChange={(v) => set("name", v)}
+            mono
+            aria-label={t("modal.name")}
+            aria-invalid={nameTaken || undefined}
+            aria-describedby={nameTaken ? nameErrorId : undefined}
+          />
           {nameTaken && (
-            <div style={s.error} role="alert">
+            <div id={nameErrorId} style={s.error} role="alert">
               {t("modal.nameTaken")}
             </div>
           )}
@@ -133,11 +145,12 @@ export function CreateSkillModal({
               value={form.type}
               onChange={(v) => set("type", v as SkillForm["type"])}
               options={SkillType.options.map((value) => ({ value, label: tSkills(`typeLabel.${value}`) }))}
+              aria-label={t("modal.type")}
             />
           </FormField>
           <FormField label={t("modal.enabled")} hint={t("modal.enabledHint")}>
             <div style={s.toggleWrap}>
-              <Toggle on={form.enabled} onChange={(v) => set("enabled", v)} />
+              <Toggle on={form.enabled} onChange={(v) => set("enabled", v)} aria-label={t("modal.enabled")} />
             </div>
           </FormField>
         </div>

@@ -1,14 +1,15 @@
-import { and, desc, eq, inArray, ne } from 'drizzle-orm';
-import type { ConventionCategory, ConventionStatus } from '@devdigest/shared';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import type { ConventionCategory, ConventionRecord, ConventionScan, ConventionStatus } from '@devdigest/shared';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 
 /**
  * Conventions data-access. Owns `conventions` and `convention_scans`;
  * workspace-scoped throughout, and a scan's rows are written in one transaction.
+ * Returns the `ConventionRecord` / `ConventionScan` contracts — rows never leave this file.
  */
-export type ConventionRow = typeof t.conventions.$inferSelect;
-export type ConventionScanRow = typeof t.conventionScans.$inferSelect;
+type ConventionRow = typeof t.conventions.$inferSelect;
+type ConventionScanRow = typeof t.conventionScans.$inferSelect;
 
 /** A verified candidate ready to be stored. */
 export interface VerifiedCandidate {
@@ -42,8 +43,8 @@ export class ConventionsRepository {
   constructor(private db: Db) {}
 
   /** The candidates shown to the user: everything except rejected rules (those stay stored for re-scans). */
-  async listForRepo(workspaceId: string, repoId: string): Promise<ConventionRow[]> {
-    return this.db
+  async listForRepo(workspaceId: string, repoId: string): Promise<ConventionRecord[]> {
+    const rows = await this.db
       .select()
       .from(t.conventions)
       .where(
@@ -54,21 +55,22 @@ export class ConventionsRepository {
         ),
       )
       .orderBy(desc(t.conventions.confidence), t.conventions.evidencePath);
+    return rows.map(toConventionRecord);
   }
 
-  async latestScan(workspaceId: string, repoId: string): Promise<ConventionScanRow | undefined> {
+  async latestScan(workspaceId: string, repoId: string): Promise<ConventionScan | undefined> {
     const [row] = await this.db
       .select()
       .from(t.conventionScans)
       .where(and(eq(t.conventionScans.workspaceId, workspaceId), eq(t.conventionScans.repoId, repoId)))
       .orderBy(desc(t.conventionScans.createdAt))
       .limit(1);
-    return row;
+    return row ? toConventionScan(row) : undefined;
   }
 
-  async getMany(workspaceId: string, repoId: string, ids: string[]): Promise<ConventionRow[]> {
+  async getMany(workspaceId: string, repoId: string, ids: string[]): Promise<ConventionRecord[]> {
     if (ids.length === 0) return [];
-    return this.db
+    const rows = await this.db
       .select()
       .from(t.conventions)
       .where(
@@ -79,21 +81,25 @@ export class ConventionsRepository {
         ),
       )
       .orderBy(desc(t.conventions.confidence), t.conventions.evidencePath);
+    return rows.map(toConventionRecord);
   }
 
   /**
    * Store one scan. A candidate that matches a stored rule (same evidence path
    * and rule key) refreshes its evidence but keeps the user's status and edited
    * text; a new one starts `pending`. Undecided rules that were not found again
-   * are dropped.
+   * are dropped. Scans of one repo run one at a time (transaction-scoped advisory
+   * lock): two overlapping extracts would both miss each other's new rows and the
+   * second would fail on the unique (repo, path, rule key) index.
    */
   async saveScan(
     workspaceId: string,
     repoId: string,
     scan: ScanValues,
     candidates: VerifiedCandidate[],
-  ): Promise<ConventionScanRow> {
-    return this.db.transaction(async (tx) => {
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`conventions:${repoId}`}, 0))`);
       const [scanRow] = await tx
         .insert(t.conventionScans)
         .values({ workspaceId, repoId, ...scan })
@@ -149,7 +155,6 @@ export class ConventionsRepository {
       if (stale.length > 0) {
         await tx.delete(t.conventions).where(inArray(t.conventions.id, stale));
       }
-      return scanRow!;
     });
   }
 
@@ -158,7 +163,7 @@ export class ConventionsRepository {
     workspaceId: string,
     id: string,
     patch: ConventionPatch,
-  ): Promise<ConventionRow | undefined> {
+  ): Promise<ConventionRecord | undefined> {
     const [row] = await this.db
       .update(t.conventions)
       .set({
@@ -168,7 +173,7 @@ export class ConventionsRepository {
       })
       .where(and(eq(t.conventions.workspaceId, workspaceId), eq(t.conventions.id, id)))
       .returning();
-    return row;
+    return row ? toConventionRecord(row) : undefined;
   }
 
   /** Move every NOT-rejected rule of a repo to `status` (select all / deselect all). */
@@ -188,4 +193,31 @@ export class ConventionsRepository {
         ),
       );
   }
+}
+
+function toConventionRecord(row: ConventionRow): ConventionRecord {
+  return {
+    id: row.id,
+    repo_id: row.repoId,
+    category: row.category as ConventionRecord['category'],
+    rule: row.rule,
+    evidence_path: row.evidencePath,
+    evidence_start_line: row.evidenceStartLine,
+    evidence_end_line: row.evidenceEndLine,
+    evidence_snippet: row.evidenceSnippet,
+    confidence: row.confidence,
+    status: row.status,
+    edited: row.edited,
+  };
+}
+
+function toConventionScan(row: ConventionScanRow): ConventionScan {
+  return {
+    id: row.id,
+    sample_count: row.sampleCount,
+    found: row.found,
+    dropped: row.dropped,
+    model: row.model,
+    created_at: row.createdAt.toISOString(),
+  };
 }

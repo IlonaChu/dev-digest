@@ -9,7 +9,9 @@ import type { Skill, SkillVersion } from "@devdigest/shared";
 import { isIdentical, lineDiff, type DiffLine } from "../../helpers";
 import { MARK, s } from "./styles";
 
-function DiffLines({ diff }: { diff: DiffLine[] }) {
+function DiffLines({ diff }: { diff: DiffLine[] | null }) {
+  const t = useTranslations("skills");
+  if (!diff) return <div style={s.same}>{t("versions.diffTooLarge")}</div>;
   return (
     <div className="mono" style={s.box}>
       {diff.map((l, i) => (
@@ -24,7 +26,18 @@ function DiffLines({ diff }: { diff: DiffLine[] }) {
 
 export function VersionDiff({ version, current }: { version: SkillVersion; current: Skill }) {
   const t = useTranslations("skills");
-  if (version.version === current.version) {
+  const isCurrent = version.version === current.version;
+  // Memoised: the diff is quadratic in the changed lines and the tab re-renders on every
+  // row toggle / refetch.
+  const bodyDiff = React.useMemo(
+    () => (isCurrent ? null : lineDiff(version.body, current.body)),
+    [isCurrent, version.body, current.body],
+  );
+  const descDiff = React.useMemo(
+    () => (isCurrent ? null : lineDiff(version.description, current.description)),
+    [isCurrent, version.description, current.description],
+  );
+  if (isCurrent) {
     return (
       <div style={s.panel}>
         <pre className="mono" style={s.plain}>
@@ -33,10 +46,8 @@ export function VersionDiff({ version, current }: { version: SkillVersion; curre
       </div>
     );
   }
-  const bodyDiff = lineDiff(version.body, current.body);
-  const descDiff = lineDiff(version.description, current.description);
-  const descSame = isIdentical(descDiff);
-  const bodySame = isIdentical(bodyDiff);
+  const descSame = !!descDiff && isIdentical(descDiff);
+  const bodySame = !!bodyDiff && isIdentical(bodyDiff);
   return (
     <div style={s.panel}>
       {!descSame && (

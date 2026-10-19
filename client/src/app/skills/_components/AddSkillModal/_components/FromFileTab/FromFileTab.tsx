@@ -43,7 +43,7 @@ export function FromFileTab({ onDone }: { onDone: () => void }) {
   return (
     <div style={s.wrap}>
       <p style={s.intro}>{t("import.intro")}</p>
-      <label style={s.drop}>
+      <label className="dd-file-drop" style={s.drop}>
         <Icon.Upload size={22} style={{ color: "var(--text-muted)" }} />
         <span style={s.dropTitle}>{draft.previewPending ? t("import.reading") : t("import.pick")}</span>
         <span style={s.dropHint}>{t("import.pickHint")}</span>
@@ -51,7 +51,7 @@ export function FromFileTab({ onDone }: { onDone: () => void }) {
           type="file"
           accept=".md,.zip"
           aria-label={t("import.pick")}
-          style={s.hiddenInput}
+          style={s.visuallyHiddenInput}
           onChange={(e) => {
             void onFile(e.target.files?.[0]);
             e.target.value = "";

@@ -1,7 +1,8 @@
-import type { SkillType } from "@devdigest/shared";
+import { SkillType } from "@devdigest/shared";
 
-/** Skill types in the order the Type select offers them. */
-export const SKILL_TYPES: readonly SkillType[] = ["rubric", "convention", "security", "custom"];
+/** Skill types in the order the Type select offers them — the contract's enum order, so a
+    type added to the contract shows up in every select. */
+export const SKILL_TYPES: readonly SkillType[] = SkillType.options;
 
 /** Default type for a skill written in the Add skill dialog. */
 export const DEFAULT_SKILL_TYPE: SkillType = "custom";

@@ -2,10 +2,11 @@ import type { CSSProperties } from "react";
 
 /** Co-located styles for SkillCard. */
 export const s = {
-  card: (active: boolean, enabled: boolean): CSSProperties => ({
+  card: (active: boolean, enabled: boolean, linked: boolean): CSSProperties => ({
+    position: "relative",
     padding: "12px 12px 10px",
     borderRadius: 8,
-    cursor: "pointer",
+    cursor: linked ? "pointer" : "default",
     border: "1px solid " + (active ? "var(--border-strong)" : "var(--border)"),
     background: active ? "var(--bg-hover)" : "var(--bg-elevated)",
     opacity: enabled ? 1 : 0.6,
@@ -23,8 +24,15 @@ export const s = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   } satisfies CSSProperties,
-  toggle: { display: "inline-flex", flexShrink: 0 } satisfies CSSProperties,
+  nameLink: { color: "inherit", textDecoration: "none" } satisfies CSSProperties,
+  /** Stretches the name's link over the whole card (the card is its containing block). */
+  stretch: { position: "absolute", inset: 0, borderRadius: 8 } satisfies CSSProperties,
+  /** Controls and tooltips that must stay clickable / hoverable above the stretched link. */
+  aboveLink: { position: "relative", zIndex: 1 } satisfies CSSProperties,
+  toggle: { display: "inline-flex", flexShrink: 0, position: "relative", zIndex: 1 } satisfies CSSProperties,
   deleteBtn: (pending: boolean): CSSProperties => ({
+    position: "relative",
+    zIndex: 1,
     background: "none",
     border: "none",
     padding: 4,
@@ -34,7 +42,6 @@ export const s = {
     cursor: pending ? "not-allowed" : "pointer",
     opacity: pending ? 0.5 : 1,
   }),
-  toggleBlocked: { opacity: 0.4, display: "inline-flex" } satisfies CSSProperties,
   description: {
     fontSize: 13,
     color: "var(--text-muted)",

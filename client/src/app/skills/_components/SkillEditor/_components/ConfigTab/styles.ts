@@ -15,7 +15,6 @@ export const s = {
     fontSize: 13,
     color: "var(--text-secondary)",
   } satisfies CSSProperties,
-  blockedWrap: { opacity: 0.4, display: "inline-flex" } satisfies CSSProperties,
   blockedNote: { fontSize: 12, color: "var(--warn)", marginBottom: 14, textAlign: "right" } satisfies CSSProperties,
   vetting: { marginBottom: 20 } satisfies CSSProperties,
   savedNote: { fontSize: 13, color: "var(--ok)", whiteSpace: "nowrap" } satisfies CSSProperties,

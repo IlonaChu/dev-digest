@@ -54,10 +54,18 @@ export function CreateTab({ onDone }: { onDone: () => void }) {
           value={type}
           onChange={(v) => setType(v as SkillType)}
           options={SKILL_TYPES.map((v) => ({ value: v, label: t(`typeLabel.${v}`) }))}
+          aria-label={t("config.type")}
         />
       </FormField>
       <FormField label={t("add.body")}>
-        <Textarea value={body} onChange={setBody} placeholder={t("add.bodyPlaceholder")} rows={BODY_ROWS} mono />
+        <Textarea
+          value={body}
+          onChange={setBody}
+          placeholder={t("add.bodyPlaceholder")}
+          rows={BODY_ROWS}
+          mono
+          aria-label={t("add.body")}
+        />
       </FormField>
       <Button
         kind="primary"

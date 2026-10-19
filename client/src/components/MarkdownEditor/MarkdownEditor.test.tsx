@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
@@ -36,10 +37,41 @@ describe("MarkdownEditor", () => {
   });
 
   it("reports edits and grows the gutter", () => {
-    let latest = "";
-    renderEditor({ value: "one", onChange: (v) => (latest = v) });
+    const changes: string[] = [];
+    function Harness() {
+      const [value, setValue] = React.useState("one");
+      return (
+        <MarkdownEditor
+          value={value}
+          onChange={(v) => {
+            changes.push(v);
+            setValue(v);
+          }}
+          fileName="pr-rubric"
+          dirty={false}
+        />
+      );
+    }
+    render(
+      <NextIntlClientProvider locale="en" messages={{ skills: messages }}>
+        <Harness />
+      </NextIntlClientProvider>,
+    );
+    const numbers = () => within(screen.getByTestId("line-numbers")).getAllByText(/^\d+$/).map((n) => n.textContent);
+    expect(numbers()).toEqual(["1"]);
     fireEvent.change(screen.getByLabelText("Skill body (Markdown)"), { target: { value: "one\ntwo" } });
-    expect(latest).toBe("one\ntwo");
+    expect(changes).toEqual(["one\ntwo"]);
+    expect(numbers()).toEqual(["1", "2"]);
+  });
+
+  it("falls back to skill.md when the name is empty", () => {
+    renderEditor({ fileName: "" });
+    expect(screen.getByText("skill.md")).toBeInTheDocument();
+  });
+
+  it("can be made read-only", () => {
+    renderEditor({ readOnly: true });
+    expect(screen.getByLabelText("Skill body (Markdown)")).toHaveAttribute("readonly");
   });
 });
 

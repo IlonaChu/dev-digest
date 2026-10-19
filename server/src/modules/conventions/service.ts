@@ -9,7 +9,7 @@ import type { Container } from '../../platform/container.js';
 import { AppError, NotFoundError, ValidationError } from '../../platform/errors.js';
 import { SAMPLE_FILE_COUNT } from './constants.js';
 import { extractCandidates } from './extraction.js';
-import { ruleKey, toConventionDto, toScanDto } from './helpers.js';
+import { ruleKey } from './helpers.js';
 import type { ConventionsRepository, VerifiedCandidate } from './repository.js';
 import { collectSamples } from './sampling.js';
 import { buildSkillDraft, estimateTokens } from './skill-draft.js';
@@ -44,11 +44,11 @@ export class ConventionsService {
 
   async list(workspaceId: string, repoId: string): Promise<ConventionList> {
     await this.requireRepo(workspaceId, repoId);
-    const [rows, scan] = await Promise.all([
+    const [items, scan] = await Promise.all([
       this.repo.listForRepo(workspaceId, repoId),
       this.repo.latestScan(workspaceId, repoId),
     ]);
-    return { items: rows.map(toConventionDto), scan: scan ? toScanDto(scan) : null };
+    return { items, scan: scan ?? null };
   }
 
   async extract(workspaceId: string, repoId: string): Promise<ConventionList> {
@@ -118,9 +118,9 @@ export class ConventionsService {
     id: string,
     patch: { status?: ConventionStatus; rule?: string },
   ): Promise<ConventionRecord> {
-    const row = await this.repo.patch(workspaceId, id, patch);
-    if (!row) throw new NotFoundError('Convention not found');
-    return toConventionDto(row);
+    const record = await this.repo.patch(workspaceId, id, patch);
+    if (!record) throw new NotFoundError('Convention not found');
+    return record;
   }
 
   async setAll(
@@ -149,7 +149,7 @@ export class ConventionsService {
   async draft(workspaceId: string, repoId: string, ids: string[]): Promise<ConventionSkillDraft> {
     const repo = await this.requireRepo(workspaceId, repoId);
     const rows = await this.pick(workspaceId, repoId, ids);
-    const d = buildSkillDraft(repo.name, rows.map(toConventionDto));
+    const d = buildSkillDraft(repo.name, rows);
     return { ...d, type: 'convention', token_estimate: estimateTokens(d.body) };
   }
 
@@ -169,7 +169,7 @@ export class ConventionsService {
       body: input.body,
       enabled: input.enabled ?? true,
       vetting: null,
-      evidenceFiles: [...new Set(rows.map((r) => r.evidencePath))],
+      evidenceFiles: [...new Set(rows.map((r) => r.evidence_path))],
     });
     return { skill_id: skill.id };
   }

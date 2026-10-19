@@ -1,6 +1,6 @@
 /* VettingPanel — the safety-check result of an imported skill: status, the hard
-   rules that fired (with line + excerpt) and the model's reasons. Used in the
-   import preview, the skill preview drawer and the editor's Config tab. */
+   rules that fired (with line + excerpt) and the model's reasons. Used by the
+   Add skill dialog's import review and the editor's Config tab. */
 "use client";
 
 import React from "react";

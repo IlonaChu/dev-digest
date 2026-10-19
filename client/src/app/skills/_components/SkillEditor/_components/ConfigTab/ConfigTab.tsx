@@ -2,14 +2,15 @@
    the enabled switch and the Save button sit in the header row. The switch is live
    (one PUT per flip, exactly like the card switch in the list) and reads the saved
    skill, so a flip in the list shows here at once; only the text fields wait for
-   Save. The form is seeded once; the parent keys this by skill id (+ version). */
+   Save. The form is seeded once; the parent keys this by skill id (+ version), so
+   the fields are read-only while a save is in flight — a new version re-seeds them. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, FormField, SelectInput, TextInput, Toggle } from "@devdigest/ui";
 import type { Skill, SkillType } from "@devdigest/shared";
-import { VettingPanel } from "@/components/VettingPanel";
+import { VettingPanel } from "@/app/skills/_components/VettingPanel";
 import { useRevetSkill, useUpdateSkill } from "@/lib/hooks/skills";
 import { blockReasonKey, requiresVetting, skillBlockReason } from "@/lib/skill-policy";
 import { useToast } from "@/lib/toast";
@@ -17,8 +18,6 @@ import { SKILL_TYPES } from "@/app/skills/constants";
 import { changedFields, createsVersion, formFrom } from "./helpers";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { s } from "./styles";
-
-const noop = () => {};
 
 export function ConfigTab({ skill }: { skill: Skill }) {
   const t = useTranslations("skills");
@@ -28,6 +27,7 @@ export function ConfigTab({ skill }: { skill: Skill }) {
   const revet = useRevetSkill();
   const [form, setForm] = React.useState(() => formFrom(skill));
   const [note, setNote] = React.useState("");
+  const blockedNoteId = React.useId();
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -66,9 +66,13 @@ export function ConfigTab({ skill }: { skill: Skill }) {
         </Badge>
         <label style={s.enabledLabel}>
           {t("config.enabled")}
-          <span style={enableLocked ? s.blockedWrap : undefined} aria-disabled={enableLocked || undefined}>
-            <Toggle on={skill.enabled} onChange={enableLocked || toggle.isPending ? noop : setEnabled} size={16} />
-          </span>
+          <Toggle
+            on={skill.enabled}
+            onChange={setEnabled}
+            size={16}
+            disabled={enableLocked || toggle.isPending}
+            aria-describedby={enableLocked ? blockedNoteId : undefined}
+          />
         </label>
         {update.isSuccess && !dirty && <span style={s.savedNote}>{t("config.saved", { version: update.data?.version })}</span>}
         <Button kind="primary" size="sm" icon="Check" onClick={save} disabled={!canSave || pending}>
@@ -76,7 +80,7 @@ export function ConfigTab({ skill }: { skill: Skill }) {
         </Button>
       </div>
       {enableLocked && reason && (
-        <div style={s.blockedNote}>
+        <div id={blockedNoteId} style={s.blockedNote}>
           {t("config.blockedEnable", { reason: t(`vetting.${blockReasonKey(reason)}`) })}
         </div>
       )}
@@ -101,13 +105,20 @@ export function ConfigTab({ skill }: { skill: Skill }) {
       )}
 
       <FormField label={t("config.name")} required>
-        <TextInput value={form.name} onChange={(v) => set("name", v)} placeholder={t("config.namePlaceholder")} mono />
+        <TextInput
+          value={form.name}
+          onChange={(v) => set("name", v)}
+          placeholder={t("config.namePlaceholder")}
+          mono
+          readOnly={pending}
+        />
       </FormField>
       <FormField label={t("config.description")} hint={t("config.descriptionHint")}>
         <TextInput
           value={form.description}
           onChange={(v) => set("description", v)}
           placeholder={t("config.descriptionPlaceholder")}
+          readOnly={pending}
         />
       </FormField>
       <FormField label={t("config.type")}>
@@ -115,6 +126,7 @@ export function ConfigTab({ skill }: { skill: Skill }) {
           value={form.type}
           onChange={(v) => set("type", v as SkillType)}
           options={SKILL_TYPES.map((v) => ({ value: v, label: t(`typeLabel.${v}`) }))}
+          disabled={pending}
         />
       </FormField>
       <FormField label={t("config.body")} required>
@@ -124,11 +136,12 @@ export function ConfigTab({ skill }: { skill: Skill }) {
           fileName={form.name}
           dirty={form.body !== skill.body}
           placeholder={t("config.bodyPlaceholder")}
+          readOnly={pending}
         />
       </FormField>
       {needsNote && (
         <FormField label={t("config.changeNote")} hint={t("config.changeNoteHint")}>
-          <TextInput value={note} onChange={setNote} placeholder={t("config.changeNotePlaceholder")} />
+          <TextInput value={note} onChange={setNote} placeholder={t("config.changeNotePlaceholder")} readOnly={pending} />
         </FormField>
       )}
     </div>

@@ -9,10 +9,11 @@ import { ToastProvider } from "@/lib/toast";
 const h = vi.hoisted(() => ({
   updateMutate: vi.fn(),
   revetMutate: vi.fn(),
+  pending: false,
 }));
 
 vi.mock("@/lib/hooks/skills", () => ({
-  useUpdateSkill: () => ({ mutate: h.updateMutate, isPending: false, isSuccess: false, data: undefined }),
+  useUpdateSkill: () => ({ mutate: h.updateMutate, isPending: h.pending, isSuccess: false, data: undefined }),
   useRevetSkill: () => ({ mutate: h.revetMutate, isPending: false }),
 }));
 
@@ -33,6 +34,7 @@ const SKILL: Skill = {
 beforeEach(() => {
   h.updateMutate.mockClear();
   h.revetMutate.mockClear();
+  h.pending = false;
 });
 afterEach(cleanup);
 
@@ -125,6 +127,15 @@ describe("skill ConfigTab", () => {
     expect(save()).toBeDisabled();
   });
 
+  it("makes the fields read-only while a save is in flight, so nothing typed then is lost on reload", () => {
+    h.pending = true;
+    renderTab(SKILL);
+    expect(body()).toHaveAttribute("readonly");
+    expect(screen.getByDisplayValue("pr-quality-rubric")).toHaveAttribute("readonly");
+    expect(screen.getByDisplayValue("Rubric for PR quality")).toHaveAttribute("readonly");
+    expect(screen.getByRole("combobox")).toBeDisabled();
+  });
+
   it("locks the switch and explains why for an imported skill that failed the check", () => {
     renderTab({
       ...SKILL,
@@ -133,10 +144,12 @@ describe("skill ConfigTab", () => {
       version: 1,
       vetting: { status: "malicious", findings: [], llm: null, version: 1, checked_at: "2026-10-19T10:00:00Z" },
     });
+    expect(screen.getByRole("switch")).toBeDisabled();
     fireEvent.click(screen.getByRole("switch"));
     expect(h.updateMutate).not.toHaveBeenCalled();
     expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "false");
     expect(screen.getByText(/Cannot be enabled/)).toBeInTheDocument();
+    expect(screen.getByRole("switch")).toHaveAccessibleDescription(/Cannot be enabled/);
     fireEvent.click(screen.getByRole("button", { name: "Re-run check" }));
     expect(h.revetMutate).toHaveBeenCalled();
   });

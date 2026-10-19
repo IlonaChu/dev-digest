@@ -16,7 +16,7 @@ const PERSISTENCE = ['node_modules/drizzle-orm/', '^src/db/'];
 
 /** SDKs that talk to the outside world (network, processes, native indexers). */
 const IO_SDKS =
-  'node_modules/(octokit|@octokit/[^/]+|simple-git|openai|@anthropic-ai/sdk|@vscode/ripgrep|@ast-grep/napi|js-tiktoken|dependency-cruiser|postgres)/';
+  'node_modules/(octokit|@octokit/[^/]+|simple-git|openai|@anthropic-ai/sdk|@vscode/ripgrep|@ast-grep/napi|js-tiktoken|fflate|dependency-cruiser|postgres)/';
 
 /** Node built-ins that do I/O. */
 const NODE_IO = '^(node:)?(fs|fs/promises|child_process|net|http|https)$';

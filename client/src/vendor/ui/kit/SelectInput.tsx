@@ -1,18 +1,19 @@
 import React from "react";
 import { Icon } from "../icons";
 
-/** REAL controlled <select>. */
+/** REAL controlled <select>. Other select attributes (`aria-label`, `disabled`, `id`) are passed through. */
 export function SelectInput({
   value,
   onChange,
   options,
   mono = true,
+  ...rest
 }: {
   value: string;
   onChange?: (v: string) => void;
   options: (string | { value: string; label: string })[];
   mono?: boolean;
-}) {
+} & Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">) {
   return (
     <div
       style={{
@@ -27,6 +28,7 @@ export function SelectInput({
       }}
     >
       <select
+        {...rest}
         className={mono ? "mono" : undefined}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
@@ -38,7 +40,7 @@ export function SelectInput({
           border: "none",
           outline: "none",
           appearance: "none",
-          cursor: "pointer",
+          cursor: rest.disabled ? "not-allowed" : "pointer",
         }}
       >
         {options.map((o) => {

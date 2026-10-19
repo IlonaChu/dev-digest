@@ -11,14 +11,32 @@ import { ToastProvider } from "@/lib/toast";
 const h = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
   pending: false,
-  error: null as unknown,
   push: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: h.push, replace: vi.fn() }) }));
-vi.mock("@/lib/hooks", () => ({
-  useCreateConventionSkill: () => ({ mutateAsync: h.mutateAsync, isPending: h.pending, error: h.error }),
-}));
+// Mirrors useMutation: a rejected call stores its error + variables and re-renders.
+vi.mock("@/lib/hooks", async () => {
+  const React = await import("react");
+  return {
+    useCreateConventionSkill: () => {
+      const [failed, setFailed] = React.useState<{ error: unknown; variables: { name: string } } | null>(null);
+      return {
+        mutateAsync: async (variables: { name: string }) => {
+          try {
+            return await h.mutateAsync(variables);
+          } catch (error) {
+            setFailed({ error, variables });
+            throw error;
+          }
+        },
+        isPending: h.pending,
+        error: failed?.error ?? null,
+        variables: failed?.variables,
+      };
+    },
+  };
+});
 
 import { CreateSkillModal } from "./CreateSkillModal";
 
@@ -35,7 +53,6 @@ beforeEach(() => {
   h.mutateAsync.mockReset();
   h.mutateAsync.mockResolvedValue({ skill_id: "skill-1" });
   h.pending = false;
-  h.error = null;
   h.push.mockClear();
 });
 afterEach(() => {
@@ -96,15 +113,25 @@ describe("CreateSkillModal", () => {
     expect(screen.getByRole("button", { name: /Create skill/ })).toBeDisabled();
   });
 
-  it("shows a taken name inline and stays open", async () => {
+  it("shows a taken name inline after the failed create and stays open", async () => {
     h.mutateAsync.mockRejectedValue(new ApiError("taken", 409, "skill_name_taken"));
-    h.error = new ApiError("taken", 409, "skill_name_taken");
     const onClose = renderModal();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Create skill/ }));
-    await waitFor(() => expect(h.mutateAsync).toHaveBeenCalled());
-    expect(screen.getByRole("alert")).toHaveTextContent("A skill with this name already exists");
+    expect(await screen.findByRole("alert")).toHaveTextContent("A skill with this name already exists");
+    expect(screen.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Name")).toHaveAccessibleDescription(/already exists/);
     expect(onClose).not.toHaveBeenCalled();
     expect(h.push).not.toHaveBeenCalled();
+  });
+
+  it("drops the taken-name error once the name is changed", async () => {
+    h.mutateAsync.mockRejectedValue(new ApiError("taken", 409, "skill_name_taken"));
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: /Create skill/ }));
+    await screen.findByRole("alert");
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "repo-conventions-2" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("closes right away when nothing was edited", () => {

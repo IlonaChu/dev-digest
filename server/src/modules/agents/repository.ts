@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import { SkillVetting } from '@devdigest/shared';
+import type { CiFailOn, Provider, ReviewStrategy, SkillSource } from '@devdigest/shared';
 import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION } from './constants.js';
 import { isConfigChange } from './helpers.js';
 
@@ -45,6 +46,23 @@ export interface UpdateAgent {
 /** A skill linked to an agent (with its order), joined from agent_skills. */
 export interface LinkedSkillRow {
   skill: typeof t.skills.$inferSelect;
+  order: number;
+  /** Per-agent switch (`agent_skills.enabled`), independent of `skill.enabled`. */
+  enabled: boolean;
+}
+
+/** A linked skill as the review prompt needs it (mapped here — no Drizzle row leaves the repository). */
+export interface PromptSkillLink {
+  skill: {
+    id: string;
+    name: string;
+    description: string;
+    body: string;
+    source: SkillSource;
+    enabled: boolean;
+    version: number;
+    vetting: SkillVetting | null;
+  };
   order: number;
   /** Per-agent switch (`agent_skills.enabled`), independent of `skill.enabled`. */
   enabled: boolean;
@@ -213,8 +231,26 @@ export class AgentsRepository {
    * filters with `isPromptUsable` (skill-policy) — the vetting policy lives
    * outside the data layer.
    */
-  async promptSkillsForAgent(agentId: string): Promise<LinkedSkillRow[]> {
-    return this.linkedSkills(agentId);
+  async promptSkillsForAgent(agentId: string): Promise<PromptSkillLink[]> {
+    const links = await this.linkedSkills(agentId);
+    return links.map(({ skill, order, enabled }) => {
+      // An unreadable vetting jsonb degrades to null = "not checked" (blocked for vetted sources).
+      const vetting = skill.vetting ? SkillVetting.safeParse(skill.vetting) : null;
+      return {
+        skill: {
+          id: skill.id,
+          name: skill.name,
+          description: skill.description,
+          body: skill.body,
+          source: skill.source,
+          enabled: skill.enabled,
+          version: skill.version,
+          vetting: vetting?.success ? vetting.data : null,
+        },
+        order,
+        enabled,
+      };
+    });
   }
 
   async skillIdsForAgent(agentId: string): Promise<string[]> {

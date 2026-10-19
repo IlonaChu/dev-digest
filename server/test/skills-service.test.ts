@@ -1,36 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Skill } from '@devdigest/shared';
 import type { Container } from '../src/platform/container.js';
-import type { SkillRow } from '../src/db/rows.js';
 import { MockLLMProvider, MockUrlFetcher } from '../src/adapters/mocks.js';
 import { AppError } from '../src/platform/errors.js';
 import type { ArchiveReader } from '../src/modules/skills/ports.js';
 import { SkillsService } from '../src/modules/skills/service.js';
 
-/** In-memory SkillsRepository covering exactly what the service calls. */
+/** In-memory SkillsRepository covering exactly what the service calls (it speaks the `Skill` contract). */
 class FakeRepo {
-  rows = new Map<string, SkillRow>();
+  rows = new Map<string, Skill>();
   versions: { skillId: string; version: number; message: string | null }[] = [];
+  private workspaceOf = new Map<string, string>();
   private n = 0;
 
   async list(ws: string) {
-    return [...this.rows.values()].filter((r) => r.workspaceId === ws).map((row) => ({ row, agentCount: 0 }));
+    return [...this.rows.values()].filter((r) => this.workspaceOf.get(r.id) === ws).map((r) => ({ ...r, agent_count: 0 }));
   }
   async getById(ws: string, id: string) {
     const r = this.rows.get(id);
-    return r && r.workspaceId === ws ? r : undefined;
+    return r && this.workspaceOf.get(id) === ws ? r : undefined;
   }
   async agentCount() {
     return 0;
   }
   async findByName(ws: string, name: string) {
-    return [...this.rows.values()].find((r) => r.workspaceId === ws && r.name === name);
+    return [...this.rows.values()].find((r) => this.workspaceOf.get(r.id) === ws && r.name === name);
   }
   async insert(v: Record<string, unknown>) {
-    if (await this.findByName(v.workspaceId as string, v.name as string)) {
+    const { workspaceId, evidenceFiles, ...fields } = v;
+    if (await this.findByName(workspaceId as string, fields.name as string)) {
       throw new AppError('skill_name_taken', 'taken', 409);
     }
-    const row = { id: `s${++this.n}`, evidenceFiles: null, createdAt: new Date(), version: 1, vetting: null, ...v } as SkillRow;
+    const row = { id: `s${++this.n}`, evidence_files: (evidenceFiles as string[] | undefined) ?? null, version: 1, vetting: null, ...fields } as Skill;
     this.rows.set(row.id, row);
+    this.workspaceOf.set(row.id, workspaceId as string);
     this.versions.push({ skillId: row.id, version: 1, message: null });
     return row;
   }
@@ -42,7 +45,7 @@ class FakeRepo {
     const next = {
       ...r,
       ...(p.name !== undefined ? { name: p.name as string } : {}),
-      ...(p.type !== undefined ? { type: p.type as SkillRow['type'] } : {}),
+      ...(p.type !== undefined ? { type: p.type as Skill['type'] } : {}),
       ...(p.enabled !== undefined ? { enabled: p.enabled as boolean } : {}),
       ...(bump ? { body: (p.body as string) ?? r.body, description: (p.description as string) ?? r.description, version: r.version + 1 } : {}),
     };
@@ -50,7 +53,7 @@ class FakeRepo {
     if (bump) this.versions.push({ skillId: id, version: next.version, message: (p.message as string) ?? null });
     return next;
   }
-  async setVetting(ws: string, id: string, vetting: SkillRow['vetting'], o: { enabled?: boolean } = {}) {
+  async setVetting(ws: string, id: string, vetting: Skill['vetting'], o: { enabled?: boolean } = {}) {
     const r = await this.getById(ws, id);
     if (!r) return undefined;
     const next = { ...r, vetting, ...(o.enabled !== undefined ? { enabled: o.enabled } : {}) };

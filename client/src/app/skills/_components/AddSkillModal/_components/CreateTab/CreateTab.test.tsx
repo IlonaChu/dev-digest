@@ -33,7 +33,7 @@ function renderTab() {
 }
 
 const submit = () => screen.getByRole("button", { name: "Create skill" });
-const body = () => screen.getByPlaceholderText("# Rule Describe the rule…");
+const body = () => screen.getByLabelText("Body (Markdown)");
 
 describe("AddSkillModal · CreateTab", () => {
   it("offers capitalised type labels and keeps Create disabled until name and body are filled", () => {
@@ -50,7 +50,7 @@ describe("AddSkillModal · CreateTab", () => {
     const onDone = renderTab();
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "  my-skill " } });
     fireEvent.change(screen.getByLabelText("Description"), { target: { value: "test" } });
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "rubric" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), { target: { value: "rubric" } });
     fireEvent.change(body(), { target: { value: "# Mine" } });
     fireEvent.click(submit());
 

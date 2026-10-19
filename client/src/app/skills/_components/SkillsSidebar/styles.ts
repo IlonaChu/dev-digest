@@ -33,4 +33,13 @@ export const s = {
   } satisfies CSSProperties,
   list: { flex: 1, overflow: "auto", padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 10 } satisfies CSSProperties,
   empty: { fontSize: 13, color: "var(--text-muted)", padding: "8px 4px" } satisfies CSSProperties,
+  error: {
+    fontSize: 13,
+    color: "var(--text-muted)",
+    padding: "8px 4px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  } satisfies CSSProperties,
 } as const;

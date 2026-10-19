@@ -25,7 +25,9 @@ export const s = {
     width: 44,
     flexShrink: 0,
     overflow: "hidden",
-    padding: "10px 8px 10px 0",
+    // Same extra bottom room as the highlight layer: the textarea's horizontal scrollbar shrinks
+    // its viewport, so without it the gutter could not scroll as far and the numbers drift.
+    padding: `${PAD_TOP}px 8px ${PAD_TOP + SCROLLBAR_ROOM}px 0`,
     textAlign: "right",
     fontSize: 12,
     lineHeight: `${LINE_HEIGHT}px`,

@@ -98,6 +98,22 @@ d('skills routes (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('a PUT that changes nothing is a no-op 200, not a 500 ("No values to set")', async () => {
+    const { app } = await makeApp();
+    const made = (
+      await app.inject({ method: 'POST', url: '/skills', payload: { name: uniq('noop'), description: 'D', body: 'same body' } })
+    ).json() as Skill;
+
+    for (const payload of [{}, { version_message: 'just a note' }, { body: 'same body', description: 'D' }]) {
+      const res = await app.inject({ method: 'PUT', url: `/skills/${made.id}`, payload });
+      expect(res.statusCode, JSON.stringify(payload)).toBe(200);
+      expect(res.json() as Skill).toMatchObject({ id: made.id, version: 1, body: 'same body', agent_count: 0 });
+    }
+    const versions = (await app.inject({ method: 'GET', url: `/skills/${made.id}/versions` })).json() as SkillVersion[];
+    expect(versions.map((v) => v.version)).toEqual([1]);
+    await app.close();
+  });
+
   it('preview parses and vets but stores nothing', async () => {
     const { app, vetCalls } = await makeApp();
     const before = await countSkills();

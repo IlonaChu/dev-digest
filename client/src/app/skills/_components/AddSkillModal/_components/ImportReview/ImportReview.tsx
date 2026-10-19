@@ -8,7 +8,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, FormField, Icon, Markdown, SelectInput, TextInput, type IconName } from "@devdigest/ui";
 import type { SkillType } from "@devdigest/shared";
-import { VettingPanel } from "@/components/VettingPanel";
+import { VettingPanel } from "@/app/skills/_components/VettingPanel";
 import { SKILL_TYPES } from "@/app/skills/constants";
 import type { ImportDraft } from "../../_lib/useImportDraft";
 import { s } from "./styles";
@@ -22,6 +22,7 @@ export function ImportReview({
   source: { icon: IconName; label: string; resetLabel: string };
 }) {
   const t = useTranslations("skills");
+  const nameErrorId = React.useId();
   const { preview } = draft;
   if (!preview) return null;
   const SourceIcon = Icon[source.icon];
@@ -48,19 +49,31 @@ export function ImportReview({
 
       <div style={s.grid}>
         <FormField label={t("import.fields.name")} required>
-          <TextInput value={draft.name} onChange={draft.setName} mono />
+          <TextInput
+            value={draft.name}
+            onChange={draft.setName}
+            mono
+            aria-label={t("import.fields.name")}
+            aria-invalid={draft.nameBlocked || undefined}
+            aria-describedby={draft.nameBlocked ? nameErrorId : undefined}
+          />
         </FormField>
         <FormField label={t("import.fields.type")}>
           <SelectInput
             value={draft.type}
             onChange={(v) => draft.setType(v as SkillType)}
             options={SKILL_TYPES.map((v) => ({ value: v, label: t(`typeLabel.${v}`) }))}
+            aria-label={t("import.fields.type")}
           />
         </FormField>
       </div>
-      {draft.nameBlocked && <div style={s.warning}>{t("import.nameTaken")}</div>}
+      {draft.nameBlocked && (
+        <div id={nameErrorId} style={s.warning} role="alert">
+          {t("import.nameTaken")}
+        </div>
+      )}
       <FormField label={t("import.fields.description")}>
-        <TextInput value={draft.description} onChange={draft.setDescription} />
+        <TextInput value={draft.description} onChange={draft.setDescription} aria-label={t("import.fields.description")} />
       </FormField>
       <FormField label={t("import.fields.body")}>
         <div style={s.bodyBox}>

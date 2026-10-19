@@ -1,20 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { LLMProvider } from '@devdigest/shared';
+import type { ConventionRecord, LLMProvider } from '@devdigest/shared';
 import { MockLLMProvider } from '../src/adapters/mocks.js';
 import type { Container } from '../src/platform/container.js';
 import { AppError } from '../src/platform/errors.js';
 import { ConventionsService } from '../src/modules/conventions/service.js';
-import type {
-  ConventionRow,
-  ScanValues,
-  VerifiedCandidate,
-} from '../src/modules/conventions/repository.js';
+import type { ScanValues, VerifiedCandidate } from '../src/modules/conventions/repository.js';
 
 const WS = 'ws1';
 const REPO = '00000000-0000-4000-8000-0000000000aa';
 
 class FakeRepo {
-  rows: ConventionRow[] = [];
+  rows: ConventionRecord[] = [];
   scans: ScanValues[] = [];
   async listForRepo() {
     return this.rows;
@@ -29,23 +25,17 @@ class FakeRepo {
     this.scans.push(scan);
     this.rows = candidates.map((c, i) => ({
       id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
-      workspaceId: WS,
-      repoId: REPO,
-      scanId: null,
+      repo_id: REPO,
       category: c.category,
       rule: c.rule,
-      ruleKey: c.ruleKey,
-      evidencePath: c.evidencePath,
-      evidenceStartLine: c.evidenceStartLine,
-      evidenceEndLine: c.evidenceEndLine,
-      evidenceSnippet: c.evidenceSnippet,
+      evidence_path: c.evidencePath,
+      evidence_start_line: c.evidenceStartLine,
+      evidence_end_line: c.evidenceEndLine,
+      evidence_snippet: c.evidenceSnippet,
       confidence: c.confidence,
       status: 'pending' as const,
       edited: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
     }));
-    return { id: 's1', createdAt: new Date(), ...scan } as never;
   }
 }
 
@@ -103,7 +93,7 @@ function setup(opts: {
 }
 
 /** Mark every stored row with `status`, as the user would by Accept / Reject. */
-const decideAll = (repo: FakeRepo, status: ConventionRow['status']) => {
+const decideAll = (repo: FakeRepo, status: ConventionRecord['status']) => {
   repo.rows = repo.rows.map((r) => ({ ...r, status }));
 };
 

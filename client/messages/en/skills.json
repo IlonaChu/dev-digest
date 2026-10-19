@@ -44,7 +44,8 @@
     "blockedToggle": "Blocked — this imported skill did not pass the safety check, so it cannot be enabled.",
     "noDescription": "No description",
     "delete": "Delete skill",
-    "meta": "{source} · v{version}"
+    "meta": "{source} · v{version}",
+    "toggle": "Enable {name}"
   },
   "type": {
     "rubric": "rubric",
@@ -136,7 +137,8 @@
       "config": "Config",
       "preview": "Preview",
       "versions": "Versions"
-    }
+    },
+    "retry": "Retry"
   },
   "config": {
     "title": "Configuration",
@@ -162,6 +164,7 @@
     "unsaved": "unsaved",
     "tokens": "~{count} tokens",
     "fileName": "{name}.md",
+    "defaultFileName": "skill",
     "ariaLabel": "Skill body (Markdown)"
   },
   "previewTab": {
@@ -182,6 +185,7 @@
     "restoredToast": "Restored v{version} as a new version",
     "empty": "No versions yet.",
     "diffSame": "Identical to the current text.",
+    "diffTooLarge": "Too many changed lines to show a diff here.",
     "diffDescription": "Description"
   },
   "agentTab": {

@@ -11,11 +11,11 @@ import type { Container } from '../../platform/container.js';
 import { AppError, ValidationError } from '../../platform/errors.js';
 import { enableBlockReason, requiresVetting } from '../_shared/skill-policy.js';
 import { FETCH_TIMEOUT_MS, INITIAL_SKILL_VERSION, MAX_ARCHIVE_BYTES, VETTING_CACHE_TTL_MS } from './constants.js';
-import { isContentChange, toSkillDto, toSkillVersionDto } from './helpers.js';
+import { isContentChange } from './helpers.js';
 import { parseSkillImport, toSkillName } from './import-parser.js';
 import { filenameFromUrl, normalizeSkillUrl } from './import-url.js';
 import type { FetchedFile } from './ports.js';
-import type { SkillRow, SkillsRepository } from './repository.js';
+import type { SkillsRepository } from './repository.js';
 import { vetContent, type VettingContent } from './vetting/vet.js';
 
 export interface CreateSkillInput {
@@ -62,13 +62,12 @@ export class SkillsService {
   }
 
   async list(workspaceId: string): Promise<Skill[]> {
-    const rows = await this.repo.list(workspaceId);
-    return rows.map((r) => toSkillDto(r.row, r.agentCount));
+    return this.repo.list(workspaceId);
   }
 
   async get(workspaceId: string, id: string): Promise<Skill | undefined> {
-    const row = await this.repo.getById(workspaceId, id);
-    return row ? toSkillDto(row, await this.repo.agentCount(id)) : undefined;
+    const skill = await this.repo.getById(workspaceId, id);
+    return skill ? this.withAgentCount(workspaceId, skill) : undefined;
   }
 
   async create(workspaceId: string, input: CreateSkillInput): Promise<Skill> {
@@ -82,7 +81,7 @@ export class SkillsService {
       enabled: input.enabled ?? true,
       vetting: null,
     });
-    return toSkillDto(row, 0);
+    return { ...row, agent_count: 0 };
   }
 
   async update(workspaceId: string, id: string, patch: UpdateSkillInput): Promise<Skill | undefined> {
@@ -111,7 +110,7 @@ export class SkillsService {
     if (vetted && contentChanged) {
       return this.revet(workspaceId, row, patch.enabled ?? row.enabled);
     }
-    return toSkillDto(row, await this.repo.agentCount(id));
+    return this.withAgentCount(workspaceId, row);
   }
 
   async delete(workspaceId: string, id: string): Promise<boolean> {
@@ -121,14 +120,14 @@ export class SkillsService {
   async listVersions(workspaceId: string, id: string): Promise<SkillVersion[] | undefined> {
     const skill = await this.repo.getById(workspaceId, id);
     if (!skill) return undefined;
-    return (await this.repo.listVersions(id)).map(toSkillVersionDto);
+    return this.repo.listVersions(workspaceId, id);
   }
 
   async restore(workspaceId: string, id: string, version: number): Promise<Skill | undefined> {
     const row = await this.repo.restore(workspaceId, id, version);
     if (!row) return undefined;
     if (requiresVetting(row.source)) return this.revet(workspaceId, row, row.enabled);
-    return toSkillDto(row, await this.repo.agentCount(id));
+    return this.withAgentCount(workspaceId, row);
   }
 
   /** Re-run the vetting check of an imported skill. */
@@ -214,7 +213,7 @@ export class SkillsService {
       enabled: false,
       vetting: this.stamp(result, INITIAL_SKILL_VERSION),
     });
-    return toSkillDto(row, 0);
+    return { ...row, agent_count: 0 };
   }
 
   // ---- internals -----------------------------------------------------------
@@ -228,7 +227,11 @@ export class SkillsService {
     return parseSkillImport(filename, bytes, this.container.archive);
   }
 
-  private assertCanEnable(skill: SkillRow): void {
+  private async withAgentCount(workspaceId: string, skill: Skill): Promise<Skill> {
+    return { ...skill, agent_count: await this.repo.agentCount(workspaceId, skill.id) };
+  }
+
+  private assertCanEnable(skill: Skill): void {
     const reason = enableBlockReason(skill);
     if (reason) {
       throw new AppError(
@@ -246,7 +249,7 @@ export class SkillsService {
    */
   private async revet(
     workspaceId: string,
-    row: SkillRow,
+    row: Skill,
     wantEnabled: boolean,
     opts: { fresh?: boolean } = {},
   ): Promise<Skill> {
@@ -256,7 +259,7 @@ export class SkillsService {
     const vetting = this.stamp(result, row.version);
     const enabled = vetting.status === 'clean' ? wantEnabled : false;
     const saved = (await this.repo.setVetting(workspaceId, row.id, vetting, { enabled })) ?? row;
-    return toSkillDto(saved, await this.repo.agentCount(row.id));
+    return this.withAgentCount(workspaceId, saved);
   }
 
   private async vetCached(

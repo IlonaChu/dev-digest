@@ -53,13 +53,25 @@ describe("SkillCard", () => {
     expect(screen.getByText("1 agent")).toBeInTheDocument();
   });
 
-  it("calls onDelete from the trash button without opening the card", () => {
+  it("links the card to its editor through the skill name, marking the open one as current", () => {
+    renderCard(<SkillCard skill={SKILL} href="/skills/s1?tab=config" active />);
+    const link = screen.getByRole("link", { name: "pr-quality-rubric" });
+    expect(link).toHaveAttribute("href", "/skills/s1?tab=config");
+    expect(link).toHaveAttribute("aria-current", "page");
+  });
+
+  it("renders the name as plain text without href", () => {
+    renderCard(<SkillCard skill={SKILL} />);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("calls onDelete from the trash button, which is not inside the card link", () => {
     const onDelete = vi.fn();
-    const onClick = vi.fn();
-    renderCard(<SkillCard skill={SKILL} onDelete={onDelete} onClick={onClick} />);
-    fireEvent.click(screen.getByRole("button", { name: "Delete skill" }));
+    renderCard(<SkillCard skill={SKILL} href="/skills/s1?tab=config" onDelete={onDelete} />);
+    const trash = screen.getByRole("button", { name: "Delete skill" });
+    fireEvent.click(trash);
     expect(onDelete).toHaveBeenCalledTimes(1);
-    expect(onClick).not.toHaveBeenCalled();
+    expect(screen.getByRole("link").contains(trash)).toBe(false);
   });
 
   it("has no trash button unless onDelete is given", () => {
@@ -67,21 +79,24 @@ describe("SkillCard", () => {
     expect(screen.queryByRole("button", { name: "Delete skill" })).not.toBeInTheDocument();
   });
 
-  it("reports the new value when the switch is clicked, without opening the card", () => {
+  it("reports the new value when the switch is clicked; the switch is not inside the card link", () => {
     const onToggle = vi.fn();
-    const onClick = vi.fn();
-    renderCard(<SkillCard skill={SKILL} onToggle={onToggle} onClick={onClick} />);
-    fireEvent.click(screen.getByRole("switch"));
+    renderCard(<SkillCard skill={SKILL} href="/skills/s1?tab=config" onToggle={onToggle} />);
+    const toggle = screen.getByRole("switch", { name: "Enable pr-quality-rubric" });
+    fireEvent.click(toggle);
     expect(onToggle).toHaveBeenCalledWith(false);
-    expect(onClick).not.toHaveBeenCalled();
+    expect(screen.getByRole("link").contains(toggle)).toBe(false);
   });
 
-  it("keeps a blocked imported skill off: the switch does nothing and a badge says why", () => {
+  it("keeps a blocked imported skill off: the switch is disabled and described by the badge", () => {
     const onToggle = vi.fn();
     renderCard(<SkillCard skill={IMPORTED} onToggle={onToggle} />);
-    fireEvent.click(screen.getByRole("switch"));
+    const toggle = screen.getByRole("switch");
+    expect(toggle).toBeDisabled();
+    fireEvent.click(toggle);
     expect(onToggle).not.toHaveBeenCalled();
     expect(screen.getByText("malicious")).toBeInTheDocument();
+    expect(toggle).toHaveAccessibleDescription(/malicious/);
     expect(screen.getByText("Imported · v1")).toBeInTheDocument();
   });
 

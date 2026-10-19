@@ -15,6 +15,7 @@ export function MarkdownEditor({
   fileName,
   dirty,
   placeholder,
+  readOnly,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -22,6 +23,8 @@ export function MarkdownEditor({
   fileName: string;
   dirty: boolean;
   placeholder?: string;
+  /** Keep the text selectable but not editable (e.g. while a save is in flight). */
+  readOnly?: boolean;
 }) {
   const t = useTranslations("skills");
   const gutterRef = React.useRef<HTMLDivElement>(null);
@@ -33,7 +36,7 @@ export function MarkdownEditor({
       <div style={s.head}>
         <Icon.FileText size={13} style={{ color: "var(--text-muted)" }} />
         <span className="mono" style={s.fileName}>
-          {t("bodyEditor.fileName", { name: fileName || "skill" })}
+          {t("bodyEditor.fileName", { name: fileName || t("bodyEditor.defaultFileName") })}
         </span>
         {dirty && <Badge color="var(--warn)" bg="var(--warn-bg)">{t("bodyEditor.unsaved")}</Badge>}
         <span className="tnum" style={s.tokens}>
@@ -58,6 +61,7 @@ export function MarkdownEditor({
             className="mono dd-body-input"
             value={value}
             placeholder={placeholder}
+            readOnly={readOnly}
             aria-label={t("bodyEditor.ariaLabel")}
             spellCheck={false}
             wrap="off"

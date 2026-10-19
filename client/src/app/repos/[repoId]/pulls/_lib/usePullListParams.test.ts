@@ -41,6 +41,25 @@ describe("usePullListParams", () => {
     expect(window.location.search).toBe("?status=all");
   });
 
+  it("resets the draft when a navigation clears ?q while the page stays mounted", () => {
+    at("?q=foo");
+    const { result, rerender } = renderHook(() => usePullListParams());
+    expect(result.current.query).toBe("foo");
+    act(() => {
+      at("");
+      rerender();
+    });
+    expect(result.current.query).toBe("");
+  });
+
+  it("keeps a draft the hook itself wrote when the URL catches up", () => {
+    at("");
+    const { result, rerender } = renderHook(() => usePullListParams());
+    act(() => result.current.setQuery("fix"));
+    act(() => rerender());
+    expect(result.current.query).toBe("fix");
+  });
+
   it("omits the default sort from the URL but keeps status explicit", () => {
     at("");
     const { result } = renderHook(() => usePullListParams());

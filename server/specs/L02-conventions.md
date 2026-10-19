@@ -25,7 +25,9 @@ Migration `0013_*` (generated). `conventions` (existing stub) gains `category`, 
 `evidence_end_line`, `scan_id`, `status` (CHECK `pending|accepted|rejected`, default `pending`, migration `0014_*`), `edited`,
 `created_at`, `updated_at`; `accepted` is dropped; `repo_id` and the evidence columns become NOT NULL; unique
 `(repo_id, evidence_path, rule_key)`. New `convention_scans`: `sample_count, found, dropped, model, tokens_in,
-tokens_out, cost_usd` (`null` = unknown price, never coerced to 0).
+tokens_out, cost_usd` (`null` = unknown price, never coerced to 0). Migration `0015_*`: indexes on
+`conventions.scan_id` and `convention_scans.workspace_id`; the separate `conventions(repo_id)` index is dropped (the
+unique index leads with `repo_id`). Scans of one repo are serialised by a transaction-scoped advisory lock.
 
 `rule_key` is the normalised ORIGINAL wording; it identifies a rule across re-scans and is not changed by an edit.
 

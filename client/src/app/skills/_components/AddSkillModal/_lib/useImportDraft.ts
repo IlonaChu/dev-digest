@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import type { SkillImportPreview, SkillType } from "@devdigest/shared";
 import { useImportSkill, useImportSkillPreview, type SkillFilePayload } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
+import { importDraftState } from "./helpers";
 
 export function useImportDraft({ onDone }: { onDone: () => void }) {
   const t = useTranslations("skills");
@@ -46,20 +47,22 @@ export function useImportDraft({ onDone }: { onDone: () => void }) {
     });
   };
 
-  // The preview only knows whether the ORIGINAL name is taken; a renamed skill may save.
-  const nameBlocked = !!preview?.name_taken && name === preview.name;
-  const canSave = !!payload && !!preview && confirmed && !nameBlocked && name.trim().length > 0;
-  const blocked = !!preview && preview.vetting.status !== "clean";
+  const { nameBlocked, canSave, blocked } = importDraftState({ preview, hasPayload: !!payload, name, confirmed });
 
   const save = async () => {
     if (!payload || !preview) return;
-    const skill = await importMut.mutateAsync({
-      ...payload,
-      name: name.trim(),
-      description,
-      type,
-      ...(sourceUrl ? { source_url: sourceUrl } : {}),
-    });
+    let skill;
+    try {
+      skill = await importMut.mutateAsync({
+        ...payload,
+        name: name.trim(),
+        description,
+        type,
+        ...(sourceUrl ? { source_url: sourceUrl } : {}),
+      });
+    } catch {
+      return; // the global mutation handler already toasted it; the review stays open
+    }
     toast.success(t("import.savedToast", { name: skill.name }));
     onDone();
     router.push(`/skills/${skill.id}?tab=config`);

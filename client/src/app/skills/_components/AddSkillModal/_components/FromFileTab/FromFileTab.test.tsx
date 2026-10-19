@@ -73,6 +73,14 @@ async function pick(name = "skill.zip", size = 20) {
 const saveButton = () => screen.getByRole("button", { name: "Save (disabled by default)" });
 
 describe("AddSkillModal · FromFileTab", () => {
+  it("keeps the file input reachable from the keyboard", () => {
+    renderTab();
+    const input = screen.getByLabelText("Choose a file");
+    expect(input).not.toHaveStyle({ display: "none" });
+    input.focus();
+    expect(input).toHaveFocus();
+  });
+
   it("starts with a file picker and no save button yet", () => {
     renderTab();
     expect(screen.getByLabelText("Choose a file")).toBeInTheDocument();
@@ -164,10 +172,18 @@ describe("AddSkillModal · FromFileTab", () => {
     await pick();
     await screen.findByText("Someone else's instructions");
     fireEvent.click(screen.getByRole("checkbox"));
-    expect(screen.getByText(/already exists/)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/already exists/);
+    const name = screen.getByLabelText("Name");
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    expect(name).toHaveAccessibleDescription(/already exists/);
     expect(saveButton()).toBeDisabled();
 
-    fireEvent.change(screen.getByDisplayValue("pr-gate"), { target: { value: "pr-gate-2" } });
+    // A trailing space is still the taken name (save trims it).
+    fireEvent.change(name, { target: { value: "pr-gate " } });
+    expect(saveButton()).toBeDisabled();
+
+    fireEvent.change(name, { target: { value: "pr-gate-2" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(saveButton()).toBeEnabled();
   });
 });

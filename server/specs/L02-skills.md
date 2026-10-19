@@ -13,6 +13,8 @@ instructions inside our prompt, so it is vetted before it can be enabled.
 - Import from `.md` or `.zip` → preview (nothing stored) → confirm → stored **disabled**.
 - Import from a public URL: the server downloads the file (http(s) only, 1 MiB / 15 s caps, GitHub file pages
   → raw) and returns the same upload payload, so preview → confirm run unchanged; stored as `source='imported_url'`.
+  SSRF guard: a host that resolves to a loopback / private / link-local / CGNAT / multicast address is refused
+  (`422 skill_fetch_failed`), and redirects are followed by hand (≤ 5) with the same check on every hop.
 - Vetting of imported skills (rules + LLM); only `clean` may be enabled.
 - Prompt assembly: enabled skills as `### Skill:` blocks, with a per-skill token count in the trace.
 - Seed: Test Quality Reviewer + 4 skills linked in order.

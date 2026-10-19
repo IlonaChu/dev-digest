@@ -29,3 +29,10 @@
   color: var(--text-muted);
   opacity: 1;
 }
+
+/* Skill import drop zone: its file input is visually hidden but focusable, so the zone
+   shows the keyboard focus ring for it (inline styles cannot target :has/:focus-visible). */
+.dd-file-drop:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

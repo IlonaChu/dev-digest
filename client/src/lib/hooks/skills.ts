@@ -7,12 +7,19 @@ import { AgentSkillLink, Skill, SkillImportFile, SkillImportPreview, SkillVersio
 import type { SkillType } from "@devdigest/shared";
 import { api } from "../api";
 
+const AGENT_LINKS_ALL = ["agent-skills"] as const;
+
 export const skillKeys = {
   all: ["skills"] as const,
   detail: (id: string | null | undefined) => ["skill", id] as const,
   versions: (id: string | null | undefined) => ["skill-versions", id] as const,
-  agentLinks: (agentId: string | null | undefined) => ["agent-skills", agentId] as const,
+  /** Prefix of every agent's link list — invalidate it when a skill's links change server-side. */
+  agentLinksAll: AGENT_LINKS_ALL,
+  agentLinks: (agentId: string | null | undefined) => [...AGENT_LINKS_ALL, agentId] as const,
 };
+
+/** Every `useSetAgentSkills` save shares this key + scope, so they run one after another. */
+const SET_AGENT_SKILLS_KEY = ["set-agent-skills"] as const;
 
 export const skillsQuery = () =>
   queryOptions({
@@ -110,6 +117,8 @@ export function useDeleteSkill() {
       qc.invalidateQueries({ queryKey: skillKeys.all });
       qc.removeQueries({ queryKey: skillKeys.detail(id) });
       qc.removeQueries({ queryKey: skillKeys.versions(id) });
+      // The server cascades the skill's agent links; the "N skills" counts read these lists.
+      qc.invalidateQueries({ queryKey: skillKeys.agentLinksAll });
     },
   });
 }
@@ -188,16 +197,38 @@ export interface AgentSkillLinkInput {
   enabled: boolean;
 }
 
-/** Replace the agent's skills with this ordered set (order = array index). */
+/** Replace the agent's skills with this ordered set (order = array index).
+    Optimistic: the cache shows the new set at once, so the next click or drag builds on it
+    instead of on the last server answer. The shared scope sends the POSTs one at a time, so
+    the server applies them in click order. */
 export function useSetAgentSkills() {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: SET_AGENT_SKILLS_KEY,
+    scope: { id: SET_AGENT_SKILLS_KEY[0] },
     mutationFn: ({ agentId, links }: { agentId: string; links: AgentSkillLinkInput[] }) =>
       api.post<AgentSkillLink[]>(`/agents/${agentId}/skills`, { links }),
-    onSuccess: (data, { agentId }) => {
-      qc.setQueryData(skillKeys.agentLinks(agentId), data);
+    onMutate: async ({ agentId, links }) => {
+      const key = skillKeys.agentLinks(agentId);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<AgentSkillLink[]>(key);
+      qc.setQueryData<AgentSkillLink[]>(
+        key,
+        links.map((l, order) => ({ agent_id: agentId, skill_id: l.skill_id, order, enabled: l.enabled })),
+      );
+      return { previous };
+    },
+    onError: (_err, { agentId }, ctx) => {
+      if (ctx?.previous) qc.setQueryData(skillKeys.agentLinks(agentId), ctx.previous);
+    },
+    onSettled: (_d, _err, { agentId }) => {
       // agent_count on the skill cards changed
       qc.invalidateQueries({ queryKey: skillKeys.all });
+      // Refetch after the LAST queued save only: an earlier refetch could land between two
+      // saves and put the older set back on screen.
+      if (qc.isMutating({ mutationKey: SET_AGENT_SKILLS_KEY }) === 1) {
+        qc.invalidateQueries({ queryKey: skillKeys.agentLinks(agentId) });
+      }
     },
   });
 }

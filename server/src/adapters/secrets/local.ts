@@ -35,8 +35,10 @@ export class LocalSecretsProvider implements SecretsProvider {
 
   private async load(): Promise<Loaded> {
     if (this.cache) return this.cache;
-    this.cache = await this.read();
-    return this.cache;
+    const loaded = await this.read();
+    // An invalid file is never cached: once the user fixes it, the next call picks it up.
+    if (!loaded.invalid) this.cache = loaded;
+    return loaded;
   }
 
   private async read(): Promise<Loaded> {
@@ -72,7 +74,8 @@ export class LocalSecretsProvider implements SecretsProvider {
   }
 
   async set(key: SecretKey, value: string): Promise<void> {
-    const loaded = await this.load();
+    // Re-read before writing: merge into what is on disk now, not into a stale cache.
+    const loaded = await this.read();
     if (loaded.invalid) {
       throw new AppError(
         'secrets_file_invalid',
@@ -83,5 +86,6 @@ export class LocalSecretsProvider implements SecretsProvider {
     loaded.values[key as string] = value;
     await mkdir(dirname(this.filePath), { recursive: true });
     await writeFile(this.filePath, `${JSON.stringify(loaded.values, null, 2)}\n`, { mode: 0o600 });
+    this.cache = loaded;
   }
 }

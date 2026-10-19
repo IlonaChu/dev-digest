@@ -5,37 +5,57 @@ export interface DiffLine {
   text: string;
 }
 
+/** Cap on the LCS table (changed lines of one side × the other) — about 4 MB. Beyond it the
+    diff is not computed: skill bodies may be up to ~1 MB (thousands of lines). */
+export const MAX_DIFF_CELLS = 1_000_000;
+
 /**
  * Line diff of two texts (longest-common-subsequence). Lines only in `from` are `del`,
- * lines only in `to` are `add`, shared lines are `same`, in reading order. Quadratic in
- * line count — fine for skill bodies (a few hundred lines).
+ * lines only in `to` are `add`, shared lines are `same`, in reading order. The shared head
+ * and tail are matched first, so the quadratic part only covers the changed middle; when
+ * that middle is still bigger than `maxCells` the result is `null` (too large to diff).
  */
-export function lineDiff(from: string, to: string): DiffLine[] {
+export function lineDiff(from: string, to: string, maxCells = MAX_DIFF_CELLS): DiffLine[] | null {
   const a = from.split("\n");
   const b = to.split("\n");
-  // lcs[i][j] = length of the LCS of a[i:] and b[j:]
-  const lcs: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
-  for (let i = a.length - 1; i >= 0; i--) {
-    for (let j = b.length - 1; j >= 0; j--) {
-      lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+    endA--;
+    endB--;
+  }
+  const n = endA - start;
+  const m = endB - start;
+  if ((n + 1) * (m + 1) > maxCells) return null;
+
+  // lcs[i * (m + 1) + j] = length of the LCS of a[start + i:endA] and b[start + j:endB]
+  const w = m + 1;
+  const lcs = new Uint32Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i * w + j] =
+        a[start + i] === b[start + j] ? lcs[(i + 1) * w + j + 1]! + 1 : Math.max(lcs[(i + 1) * w + j]!, lcs[i * w + j + 1]!);
     }
   }
-  const out: DiffLine[] = [];
+  const out: DiffLine[] = a.slice(0, start).map((text) => ({ kind: "same" as const, text }));
   let i = 0;
   let j = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      out.push({ kind: "same", text: a[i]! });
+  while (i < n && j < m) {
+    if (a[start + i] === b[start + j]) {
+      out.push({ kind: "same", text: a[start + i]! });
       i++;
       j++;
-    } else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) {
-      out.push({ kind: "del", text: a[i++]! });
+    } else if (lcs[(i + 1) * w + j]! >= lcs[i * w + j + 1]!) {
+      out.push({ kind: "del", text: a[start + i++]! });
     } else {
-      out.push({ kind: "add", text: b[j++]! });
+      out.push({ kind: "add", text: b[start + j++]! });
     }
   }
-  while (i < a.length) out.push({ kind: "del", text: a[i++]! });
-  while (j < b.length) out.push({ kind: "add", text: b[j++]! });
+  while (i < n) out.push({ kind: "del", text: a[start + i++]! });
+  while (j < m) out.push({ kind: "add", text: b[start + j++]! });
+  for (const text of a.slice(endA)) out.push({ kind: "same", text });
   return out;
 }
 

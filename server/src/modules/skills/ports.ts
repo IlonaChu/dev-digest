@@ -21,7 +21,10 @@ export interface ArchiveEntry {
 export interface ArchiveReader {
   /** Entries listed from the central directory only — no entry is inflated. */
   listEntries(archive: Uint8Array): ArchiveEntry[];
-  /** UTF-8 text of one entry. Throws if the real size exceeds `maxBytes`. */
+  /**
+   * UTF-8 text of one entry. Throws if its declared size exceeds `maxBytes`; the
+   * output never exceeds `maxBytes`, even when the declared size lies.
+   */
   readText(archive: Uint8Array, path: string, maxBytes: number): string;
 }
 

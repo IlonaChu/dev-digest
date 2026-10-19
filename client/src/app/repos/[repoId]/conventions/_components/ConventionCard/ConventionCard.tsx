@@ -6,7 +6,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Button, Textarea } from "@devdigest/ui";
 import type { ConventionRecord, ConventionStatus } from "@devdigest/shared";
-import { locationLabel } from "../../helpers";
+import { locationLabel } from "./helpers";
 import { ConfidenceBar } from "./_components/ConfidenceBar";
 import { EvidenceBlock } from "./_components/EvidenceBlock";
 import { s } from "./styles";

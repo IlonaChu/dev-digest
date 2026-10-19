@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import type { SkillSource, SkillType, SkillVetting } from '@devdigest/shared';
+import { SkillVetting } from '@devdigest/shared';
+import type { Skill, SkillSource, SkillType, SkillVersion } from '@devdigest/shared';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { SkillRow, SkillVersionRow } from '../../db/rows.js';
@@ -10,8 +11,8 @@ import { INITIAL_SKILL_VERSION } from './constants.js';
  * Skills data-access. Owns `skills` and `skill_versions`; the `agent_skills`
  * link table belongs to the agents module (we only COUNT it for the cards).
  * Workspace-scoped throughout; every multi-row write is one transaction.
+ * Returns the `Skill` / `SkillVersion` contracts — rows never leave this file.
  */
-export type { SkillRow, SkillVersionRow };
 
 export interface InsertSkill {
   workspaceId: string;
@@ -36,15 +37,11 @@ export interface UpdateSkill {
   message?: string;
 }
 
-export interface SkillWithCount {
-  row: SkillRow;
-  agentCount: number;
-}
-
 export class SkillsRepository {
   constructor(private db: Db) {}
 
-  async list(workspaceId: string): Promise<SkillWithCount[]> {
+  /** Every skill of the workspace with its `agent_count`, by name. */
+  async list(workspaceId: string): Promise<Skill[]> {
     const rows = await this.db
       .select({ skill: t.skills, agentCount: sql<number>`count(${t.agentSkills.agentId})::int` })
       .from(t.skills)
@@ -52,35 +49,37 @@ export class SkillsRepository {
       .where(eq(t.skills.workspaceId, workspaceId))
       .groupBy(t.skills.id)
       .orderBy(asc(t.skills.name));
-    return rows.map((r) => ({ row: r.skill, agentCount: r.agentCount }));
+    return rows.map((r) => ({ ...toSkill(r.skill), agent_count: r.agentCount }));
   }
 
-  async getById(workspaceId: string, id: string): Promise<SkillRow | undefined> {
+  async getById(workspaceId: string, id: string): Promise<Skill | undefined> {
     const [row] = await this.db
       .select()
       .from(t.skills)
       .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)));
-    return row;
+    return row ? toSkill(row) : undefined;
   }
 
-  async agentCount(skillId: string): Promise<number> {
+  /** How many agents link this skill (0 for a skill of another workspace). */
+  async agentCount(workspaceId: string, skillId: string): Promise<number> {
     const [r] = await this.db
       .select({ n: sql<number>`count(*)::int` })
       .from(t.agentSkills)
-      .where(eq(t.agentSkills.skillId, skillId));
+      .innerJoin(t.skills, eq(t.skills.id, t.agentSkills.skillId))
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.agentSkills.skillId, skillId)));
     return r?.n ?? 0;
   }
 
-  async findByName(workspaceId: string, name: string): Promise<SkillRow | undefined> {
+  async findByName(workspaceId: string, name: string): Promise<Skill | undefined> {
     const [row] = await this.db
       .select()
       .from(t.skills)
       .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, name)));
-    return row;
+    return row ? toSkill(row) : undefined;
   }
 
   /** Insert a skill AND its version-1 snapshot atomically. */
-  async insert(values: InsertSkill): Promise<SkillRow> {
+  async insert(values: InsertSkill): Promise<Skill> {
     return this.guardNameClash(() =>
       this.db.transaction(async (tx) => {
         const [row] = await tx
@@ -105,16 +104,17 @@ export class SkillsRepository {
           description: values.description,
           message: null,
         });
-        return row!;
+        return toSkill(row!);
       }),
     );
   }
 
   /**
    * Update a skill. A change to body or description bumps the version and
-   * snapshots it (with the optional note); name/type/enabled never do.
+   * snapshots it (with the optional note); name/type/enabled never do. A patch
+   * that changes nothing (`{}`, only a note, the same body) writes nothing.
    */
-  async update(workspaceId: string, id: string, patch: UpdateSkill): Promise<SkillRow | undefined> {
+  async update(workspaceId: string, id: string, patch: UpdateSkill): Promise<Skill | undefined> {
     return this.guardNameClash(() =>
       this.db.transaction(async (tx) => {
         const [existing] = await tx
@@ -131,16 +131,16 @@ export class SkillsRepository {
         const body = patch.body ?? existing.body;
         const description = patch.description ?? existing.description;
 
-        const [row] = await tx
-          .update(t.skills)
-          .set({
-            ...(patch.name !== undefined ? { name: patch.name } : {}),
-            ...(patch.type !== undefined ? { type: patch.type } : {}),
-            ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-            ...(bump ? { body, description, version: nextVersion } : {}),
-          })
-          .where(eq(t.skills.id, id))
-          .returning();
+        const changes = {
+          ...(patch.name !== undefined ? { name: patch.name } : {}),
+          ...(patch.type !== undefined ? { type: patch.type } : {}),
+          ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+          ...(bump ? { body, description, version: nextVersion } : {}),
+        };
+        // Drizzle throws "No values to set" on an empty SET — nothing to do anyway.
+        if (Object.keys(changes).length === 0) return toSkill(existing);
+
+        const [row] = await tx.update(t.skills).set(changes).where(eq(t.skills.id, id)).returning();
 
         if (bump) {
           await tx.insert(t.skillVersions).values({
@@ -151,25 +151,27 @@ export class SkillsRepository {
             message: patch.message?.trim() || null,
           });
         }
-        return row;
+        return row ? toSkill(row) : undefined;
       }),
     );
   }
 
-  /** Newest first. Caller has already verified the skill belongs to the workspace. */
-  async listVersions(skillId: string): Promise<SkillVersionRow[]> {
-    return this.db
-      .select()
+  /** Newest first; empty for a skill of another workspace. */
+  async listVersions(workspaceId: string, skillId: string): Promise<SkillVersion[]> {
+    const rows = await this.db
+      .select({ version: t.skillVersions })
       .from(t.skillVersions)
-      .where(eq(t.skillVersions.skillId, skillId))
+      .innerJoin(t.skills, eq(t.skills.id, t.skillVersions.skillId))
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skillVersions.skillId, skillId)))
       .orderBy(desc(t.skillVersions.version));
+    return rows.map((r) => toSkillVersion(r.version));
   }
 
   /**
    * Restore vK as a NEW version carrying vK's content (history is append-only).
    * Undefined when the skill or that version does not exist.
    */
-  async restore(workspaceId: string, id: string, version: number): Promise<SkillRow | undefined> {
+  async restore(workspaceId: string, id: string, version: number): Promise<Skill | undefined> {
     return this.db.transaction(async (tx) => {
       const [existing] = await tx
         .select()
@@ -196,7 +198,7 @@ export class SkillsRepository {
         description: snap.description,
         message: `Restored from v${version}`,
       });
-      return row;
+      return row ? toSkill(row) : undefined;
     });
   }
 
@@ -206,13 +208,13 @@ export class SkillsRepository {
     id: string,
     vetting: SkillVetting,
     opts: { enabled?: boolean } = {},
-  ): Promise<SkillRow | undefined> {
+  ): Promise<Skill | undefined> {
     const [row] = await this.db
       .update(t.skills)
       .set({ vetting, ...(opts.enabled !== undefined ? { enabled: opts.enabled } : {}) })
       .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
       .returning();
-    return row;
+    return row ? toSkill(row) : undefined;
   }
 
   /** Delete a skill (versions and agent links cascade). False if it wasn't there. */
@@ -236,4 +238,34 @@ export class SkillsRepository {
       throw err;
     }
   }
+}
+
+/** Map a persisted skill row to the `Skill` contract (without `agent_count`). */
+function toSkill(row: SkillRow): Skill {
+  // The vetting jsonb is untyped at rest; an unreadable value degrades to null,
+  // which the policy treats as "not checked" (blocked), never as clean.
+  const vetting = row.vetting ? SkillVetting.safeParse(row.vetting) : null;
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    type: row.type,
+    source: row.source,
+    body: row.body,
+    enabled: row.enabled,
+    version: row.version,
+    evidence_files: row.evidenceFiles ?? null,
+    vetting: vetting?.success ? vetting.data : null,
+  };
+}
+
+function toSkillVersion(row: SkillVersionRow): SkillVersion {
+  return {
+    skill_id: row.skillId,
+    version: row.version,
+    body: row.body,
+    description: row.description,
+    message: row.message ?? null,
+    created_at: row.createdAt.toISOString(),
+  };
 }

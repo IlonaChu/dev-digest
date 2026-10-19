@@ -40,7 +40,9 @@ export default function ConventionsPage() {
   const reject = useRejectConvention(repoId);
   const setAll = useSetAllConventions(repoId);
   const draftMut = useConventionSkillDraft(repoId);
-  const [draft, setDraft] = React.useState<ConventionSkillDraft | null>(null);
+  // The draft and the ids it was built from travel together: cards stay clickable while the
+  // draft loads, so ids recomputed at render could disagree with the body the modal shows.
+  const [draft, setDraft] = React.useState<{ draft: ConventionSkillDraft; ids: string[] } | null>(null);
 
   const repoName = activeRepo?.full_name ?? repoId;
   const shortName = activeRepo?.name ?? repoName;
@@ -61,11 +63,10 @@ export default function ConventionsPage() {
   const notReady = extract.error instanceof ApiError && extract.error.code === NOT_READY_CODE;
   const onExtract = () => extract.mutate();
 
-  const openModal = () =>
-    draftMut.mutate(
-      accepted.map((c) => c.id),
-      { onSuccess: setDraft },
-    );
+  const openModal = () => {
+    const ids = accepted.map((c) => c.id);
+    draftMut.mutate(ids, { onSuccess: (d) => setDraft({ draft: d, ids }) });
+  };
 
   return (
     <AppShell crumb={crumb}>
@@ -160,8 +161,8 @@ export default function ConventionsPage() {
         <CreateSkillModal
           repoId={repoId}
           repoName={shortName}
-          draft={draft}
-          conventionIds={accepted.map((c) => c.id)}
+          draft={draft.draft}
+          conventionIds={draft.ids}
           onClose={() => setDraft(null)}
         />
       )}

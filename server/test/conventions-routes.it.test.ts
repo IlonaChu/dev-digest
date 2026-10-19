@@ -203,6 +203,21 @@ d('conventions routes (Testcontainers pg)', () => {
     await second.app.close();
   });
 
+  it('two overlapping extracts of one repo both succeed and store each rule once', async () => {
+    const repo = await makeRepo();
+    const { app } = await makeApp();
+    const url = `/repos/${repo.id}/conventions/extract`;
+
+    const [a, b] = await Promise.all([app.inject({ method: 'POST', url }), app.inject({ method: 'POST', url })]);
+    expect([a.statusCode, b.statusCode]).toEqual([200, 200]);
+
+    const rows = await pg.handle.db.select().from(t.conventions).where(eq(t.conventions.repoId, repo.id));
+    expect(rows.map((r) => r.rule).sort()).toEqual([asyncRule.rule, redisRule.rule].sort());
+    const scans = await pg.handle.db.select().from(t.conventionScans).where(eq(t.conventionScans.repoId, repo.id));
+    expect(scans).toHaveLength(2);
+    await app.close();
+  });
+
   it('409 repo_not_ready without calling the model (no clone / nothing indexed)', async () => {
     const noClone = await makeRepo(null);
     const a = await makeApp();

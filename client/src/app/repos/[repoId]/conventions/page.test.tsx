@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ConventionList, ConventionSkillDraft } from "@devdigest/shared";
 import messages from "../../../../../messages/en/conventions.json";
@@ -133,6 +133,29 @@ describe("Conventions page", () => {
     expect(h.draftMutate.mock.calls[0]![0]).toEqual([A.id]);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText("Name")).toHaveValue("repo-conventions");
+  });
+
+  it("keeps the ids the draft was built from, even if the accepted set changes while it loads", () => {
+    list();
+    const draft: ConventionSkillDraft = { name: "repo-conventions", description: "d", type: "convention", body: "# b\n", token_estimate: 2 };
+    let resolve: (d: ConventionSkillDraft) => void = () => {};
+    h.draftMutate.mockImplementation((_ids: string[], opts: { onSuccess: (d: ConventionSkillDraft) => void }) => {
+      resolve = opts.onSuccess;
+    });
+    const ui = (
+      <NextIntlClientProvider locale="en" messages={{ conventions: messages, skills: skillsMessages, common: commonMessages }}>
+        <ToastProvider>
+          <ConventionsPage />
+        </ToastProvider>
+      </NextIntlClientProvider>
+    );
+    const { rerender } = render(ui);
+    fireEvent.click(screen.getByRole("button", { name: /Create skill/ }));
+    // B gets accepted while the draft request is still in flight.
+    list([A, { ...B, status: "accepted" }]);
+    rerender(ui);
+    act(() => resolve(draft));
+    expect(screen.getByRole("note")).toHaveTextContent("Merged from 1 accepted convention");
   });
 
   it("after a scan offers only ReScan in the header", () => {

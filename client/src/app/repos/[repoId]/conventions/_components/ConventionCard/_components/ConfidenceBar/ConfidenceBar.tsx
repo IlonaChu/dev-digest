@@ -3,7 +3,7 @@
 
 import { useTranslations } from "next-intl";
 import { ProgressBar } from "@devdigest/ui";
-import { confidenceColor, confidencePercent } from "../../../../helpers";
+import { confidenceColor, confidencePercent } from "./helpers";
 import { s } from "./styles";
 
 export function ConfidenceBar({ value }: { value: number }) {

@@ -54,6 +54,19 @@ describe('LocalSecretsProvider', () => {
     expect(await readFile(file, 'utf8')).toBe('{ "OPENAI_API_KEY": "sk-1",');
   });
 
+  it('picks up a fixed file without a restart (the invalid state is not cached)', async () => {
+    await writeFile(file, '{ "OPENAI_API_KEY": "sk-1",');
+    const p = provider();
+    await expect(p.set('GITHUB_TOKEN', 'ghp_1')).rejects.toMatchObject({ code: 'secrets_file_invalid' });
+
+    // the user follows the 409 message and fixes the file by hand
+    await writeFile(file, JSON.stringify({ OPENAI_API_KEY: 'sk-fixed' }));
+    expect(await p.get('OPENAI_API_KEY')).toBe('sk-fixed');
+    await p.set('GITHUB_TOKEN', 'ghp_1');
+    expect(JSON.parse(await readFile(file, 'utf8'))).toEqual({ OPENAI_API_KEY: 'sk-fixed', GITHUB_TOKEN: 'ghp_1' });
+    expect(await p.get('GITHUB_TOKEN')).toBe('ghp_1');
+  });
+
   it('reads GITHUB_PAT as the legacy fallback for GITHUB_TOKEN', async () => {
     expect(await provider({ GITHUB_PAT: 'ghp_legacy' }).get('GITHUB_TOKEN')).toBe('ghp_legacy');
   });
