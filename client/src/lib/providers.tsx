@@ -2,6 +2,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import {
   QueryClient,
   QueryClientProvider,
@@ -13,12 +14,13 @@ import { RepoProvider } from "./repo-context";
 import { ToastProvider, notify } from "./toast";
 import { ApiError } from "./api";
 
-function errorMessage(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  return "Something went wrong";
+function errorMessage(e: unknown, fallback: string): string {
+  return e instanceof Error ? e.message : fallback;
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("common");
+  const fallback = t("states.error");
   const [qc] = React.useState(
     () =>
       new QueryClient({
@@ -35,11 +37,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         queryCache: new QueryCache({
           onError: (err) => {
             const status = err instanceof ApiError ? err.status : 500;
-            if (status === 0 || status >= 500) notify.error(errorMessage(err));
+            if (status === 0 || status >= 500) notify.error(errorMessage(err, fallback));
           },
         }),
         mutationCache: new MutationCache({
-          onError: (err) => notify.error(errorMessage(err)),
+          onError: (err) => notify.error(errorMessage(err, fallback)),
         }),
       })
   );

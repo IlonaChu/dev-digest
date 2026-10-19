@@ -13,6 +13,7 @@
  */
 import { getEncoding, type Tiktoken } from 'js-tiktoken';
 
+/** Same shape as the `Tokenizer` port in modules/repo-intel/ports.ts. */
 export interface Tokenizer {
   count(text: string): number;
 }

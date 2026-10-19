@@ -72,10 +72,12 @@ flowchart TB
     reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace)"]
   end
   subgraph Agents["Agents"]
-    agents["agents<br/>/agents · /agents/:id"]
+    agents["agents<br/>/agents · /agents/:id · /agents/:id/skills"]
+    skills["skills<br/>/skills · /skills/:id/(versions|restore|vet)<br/>/skills/import(/preview|/fetch)"]
   end
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
+    conventions["conventions<br/>/repos/:id/conventions(/extract|/status|/skill-draft|/skill)<br/>/conventions/:id"]
   end
   subgraph Platform["Platform"]
     settings["settings<br/>/settings · /providers"]

@@ -4,16 +4,31 @@ export function Toggle({
   on,
   onChange,
   size = 18,
+  disabled = false,
+  title,
+  "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   size?: number;
+  /** A real `disabled` button: skipped by Tab, announced as unavailable, ignores clicks. */
+  disabled?: boolean;
+  title?: string;
+  "aria-label"?: string;
+  /** Id of the element that explains the state (e.g. why the switch is locked). */
+  "aria-describedby"?: string;
 }) {
   return (
     <button
+      type="button"
       onClick={() => onChange(!on)}
       role="switch"
       aria-checked={on}
+      disabled={disabled}
+      title={title}
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
       style={{
         width: size * 1.85,
         height: size + 4,
@@ -23,6 +38,8 @@ export function Toggle({
         background: on ? "var(--accent)" : "var(--border-strong)",
         transition: "background .15s",
         position: "relative",
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
       <span

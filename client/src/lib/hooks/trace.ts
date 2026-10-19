@@ -3,17 +3,23 @@
    tool_calls[] + raw_output + memory_pulled[] + full log). Registered by A2;
    A5 enriches the document it returns. Live events stream via useRunEvents
    (hooks/reviews.ts) — the drawer combines both. */
-"use client";
-
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
+import { RunTrace } from "@devdigest/shared";
 import { api } from "../api";
-import type { RunTrace } from "@devdigest/shared";
 
-export function useRunTrace(runId: string | null | undefined, enabled = true) {
-  return useQuery({
-    queryKey: ["run-trace", runId],
-    queryFn: () => api.get<RunTrace>(`/runs/${runId}/trace`),
-    enabled: !!runId && enabled,
+export const traceKeys = {
+  detail: (runId: string | null | undefined) => ["run-trace", runId] as const,
+};
+
+export const runTraceQuery = (runId: string | null | undefined) =>
+  queryOptions({
+    queryKey: traceKeys.detail(runId),
+    queryFn: () => api.get(`/runs/${runId}/trace`, RunTrace),
+    enabled: !!runId,
     retry: false,
   });
+
+export function useRunTrace(runId: string | null | undefined, enabled = true) {
+  const query = runTraceQuery(runId);
+  return useQuery({ ...query, enabled: query.enabled && enabled });
 }

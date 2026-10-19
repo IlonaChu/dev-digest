@@ -114,6 +114,19 @@ repository.ts  the only layer that touches Drizzle for that domain
 - Not every route follows the full stack. `modules/pulls/routes.ts` queries
   `container.db` directly (list/detail, GitHub sync, rollups) and has no service or
   repository file. Treat it as the exception, not a template for new modules.
+  The same holds for the `settings`, `polling` and `workspace` routes.
+
+### Enforcement
+
+The layering is checked by dependency-cruiser (`.dependency-cruiser.cjs`, run by
+`pnpm arch:check` and by `test/architecture.test.ts` inside `pnpm test`): only
+`repository*` files import Drizzle/`src/db`, modules never import `src/adapters/*`
+or another module, SDKs and `fs` stay in adapters, adapters and `platform/*` (except
+the container) never import modules, and `src/vendor/shared` stays dependency-free.
+The baseline `.dependency-cruiser-known-violations.json` is empty (the 31 violations
+that predated the check were fixed on 2026-10-18), so any violation fails the check. Rules,
+rationale and the baseline policy: the `onion-architecture` skill
+(`.claude/skills/onion-architecture/`).
 
 ## Errors
 
@@ -128,9 +141,11 @@ by hand. The single `app.setErrorHandler` in `app.ts` maps, in order:
    500 `internal_error` (the raw object is never leaked).
 3. any `ZodError`, matched by `instanceof` **or** by shape (`name === 'ZodError'` plus
    `issues`/`errors`), because `instanceof` fails across duplicate zod instances
-   (shared vs api) → 422. This is what catches `RunRequest.parse()` in the review route.
+   (shared vs api) → 422. This catches service-level `.parse()` calls.
 4. `AppError` → its `statusCode` with `{ error: { code, message, details } }`.
-5. anything else → logged, `err.statusCode ?? 500`, code `internal_error`.
+5. anything else → logged, code `internal_error`. A framework 4xx (rate limit, bad JSON,
+   body too large) keeps its status and message; everything else becomes 500 with the
+   generic message `Internal error`, so SQL or filesystem details never reach the client.
 
 The handler is registered before the modules so the encapsulated module plugins
 inherit it. Health routes: `/health` (liveness) and `/health/ready` (`select 1`, 503 on

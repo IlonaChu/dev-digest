@@ -1,12 +1,11 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import type { PromptSkillMeta, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
-import * as schema from '../../db/schema.js';
-import type { AgentRow } from '../../db/rows.js';
-import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
+import type { ReviewRepository } from './repository.js';
+import type { PersistedRun, ReviewAgent, ReviewPull, ReviewRepoRef } from './types.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { taskLine, selectPromptSkills, buildSkillPrompt, skillsLogLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
@@ -27,9 +26,7 @@ export type Logger = {
 
 // A reduced "Review per file" — same schema as Review (the model returns a small
 // Review per file; we merge findings + take the worst verdict / mean score).
-export type RunOutcome = {
-  review: ReviewRow;
-  findings: FindingRow[];
+export type RunOutcome = PersistedRun & {
   grounding: string;
   raw: Review;
 };
@@ -54,9 +51,9 @@ export class ReviewRunExecutor {
    */
   async executeRuns(
     workspaceId: string,
-    pull: PullRow,
-    repo: typeof schema.repos.$inferSelect,
-    jobs: { agent: AgentRow; runId: string }[],
+    pull: ReviewPull,
+    repo: ReviewRepoRef,
+    jobs: { agent: ReviewAgent; runId: string }[],
     logger?: Logger,
   ): Promise<void> {
     // ONE logger fanned out over every queued run: shared pre-work (diff +
@@ -116,11 +113,11 @@ export class ReviewRunExecutor {
           {
             runId,
             agent: agent.name,
-            findings: outcome.findings.length,
+            findings: outcome.findingsCount,
             grounding: outcome.grounding,
             durationMs: Date.now() - agentStart,
           },
-          `review: agent "${agent.name}" done — ${outcome.findings.length} finding(s)`,
+          `review: agent "${agent.name}" done — ${outcome.findingsCount} finding(s)`,
         );
       } catch (err) {
         // runOneAgent already persisted the failure/cancel (status + error +
@@ -137,10 +134,10 @@ export class ReviewRunExecutor {
   /** Execute a single agent's review against a PR, streaming progress. */
   private async runOneAgent(
     workspaceId: string,
-    pull: PullRow,
-    repo: typeof schema.repos.$inferSelect,
+    pull: ReviewPull,
+    repo: ReviewRepoRef,
     diff: UnifiedDiff,
-    agent: AgentRow,
+    agent: ReviewAgent,
     runId: string,
     parentLog: RunLogger,
   ): Promise<RunOutcome> {
@@ -157,7 +154,7 @@ export class ReviewRunExecutor {
       // key is missing — caught below and persisted as a failed run.)
       const llm = await runLog.step(
         `Resolving ${agent.provider} provider`,
-        () => this.container.llm(agent.provider as Provider),
+        () => this.container.llm(agent.provider),
         { kind: 'tool' },
       );
 
@@ -183,6 +180,12 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Skills: ordered blocks of the agent's linked skills that are enabled
+      // globally AND for this agent AND pass the vetting policy. Disabled ones
+      // never reach the prompt or the log. Best-effort — a load failure must
+      // not fail the review.
+      const { blocks: skillBlocks, meta: skillsMeta } = await this.resolveSkills(agent.id, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -204,6 +207,7 @@ export class ReviewRunExecutor {
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
         task,
+        ...(skillBlocks.length > 0 ? { skills: skillBlocks } : {}),
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
         checkCancelled: () => {
@@ -214,44 +218,44 @@ export class ReviewRunExecutor {
 
       const keptFindings = outcome.review.findings;
 
-      // ---- Persist review + findings ----------------------------------------
-      const review = await this.repo.insertReview({
-        workspaceId,
-        prId: pull.id,
-        agentId: agent.id,
-        runId,
-        kind: 'review',
-        verdict: outcome.review.verdict,
-        summary: outcome.review.summary,
-        score: outcome.review.score,
-        model: agent.model,
-      });
-      const findingRows = await this.repo.insertFindings(review.id, keptFindings);
-      runLog.result(`Persisted review ${review.id} with ${findingRows.length} finding(s)`);
-
-      // Mark the commit this review ran against so the PR list can tell
-      // reviewed / needs-review (head moved) / stale apart.
-      await this.repo.markReviewed(pull.id, pull.headSha);
-
       const durationMs = Date.now() - start;
 
       // Deterministic blocker count (severity ≥ the agent's gate) — the signal
       // the timeline colors on, NOT the model's self-reported verdict.
       const blockers = countBlockers(keptFindings, agent.ciFailOn);
 
-      // ---- Observability: agent_runs + ONE run_traces document --------------
-      await this.repo.completeAgentRun(runId, {
-        status: 'done',
-        durationMs,
-        tokensIn,
-        tokensOut,
-        costUsd,
-        findingsCount: findingRows.length,
-        grounding,
-        score: outcome.review.score,
-        blockers,
-        error: null,
+      // ---- Persist review + findings + reviewed SHA + agent_runs (atomic) ---
+      // The reviewed head SHA lets the PR list tell reviewed / needs-review
+      // (head moved) / stale apart.
+      const persisted = await this.repo.persistRunOutcome({
+        runId,
+        review: {
+          workspaceId,
+          prId: pull.id,
+          agentId: agent.id,
+          runId,
+          kind: 'review',
+          verdict: outcome.review.verdict,
+          summary: outcome.review.summary,
+          score: outcome.review.score,
+          model: agent.model,
+        },
+        findings: keptFindings,
+        headSha: pull.headSha,
+        completion: {
+          durationMs,
+          tokensIn,
+          tokensOut,
+          costUsd,
+          grounding,
+          score: outcome.review.score,
+          blockers,
+          error: null,
+        },
       });
+      runLog.result(`Persisted review ${persisted.reviewId} with ${persisted.findingsCount} finding(s)`);
+
+      // ---- Observability: ONE run_traces document ---------------------------
 
       const trace: RunTrace = {
         config: {
@@ -267,10 +271,13 @@ export class ReviewRunExecutor {
           tokens_in: tokensIn,
           tokens_out: tokensOut,
           cost_usd: costUsd,
-          findings: findingRows.length,
+          findings: persisted.findingsCount,
           grounding,
         },
-        prompt_assembly: outcome.assembly,
+        prompt_assembly: {
+          ...outcome.assembly,
+          skills_meta: skillsMeta.length > 0 ? skillsMeta : null,
+        },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
           args: c.label,
@@ -288,7 +295,7 @@ export class ReviewRunExecutor {
       await this.repo.saveRunTrace(runId, trace);
       this.container.runBus.complete(runId);
 
-      return { review, findings: findingRows, grounding, raw: outcome.review };
+      return { ...persisted, grounding, raw: outcome.review };
     } catch (err) {
       // Failure/cancel: persist status + the error text + the log-so-far so the
       // run (and WHY it failed) is visible on the UI after a reload.
@@ -312,6 +319,24 @@ export class ReviewRunExecutor {
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
+    }
+  }
+
+  /** Skill blocks + per-skill token meta for the agent's prompt; empty on none/failure. */
+  private async resolveSkills(
+    agentId: string,
+    runLog: RunLogger,
+  ): Promise<{ blocks: string[]; meta: PromptSkillMeta[] }> {
+    try {
+      const rows = await this.agents.promptSkillsForAgent(agentId);
+      const built = buildSkillPrompt(selectPromptSkills(rows), (text) =>
+        this.container.tokenizer.count(text),
+      );
+      if (built.meta.length > 0) runLog.info(skillsLogLine(built.meta));
+      return built;
+    } catch (err) {
+      runLog.info(`skills: could not load — continuing without (${(err as Error).message})`);
+      return { blocks: [], meta: [] };
     }
   }
 
@@ -409,8 +434,8 @@ export class ReviewRunExecutor {
    */
   private traceFromBuffer(
     runId: string,
-    pull: PullRow,
-    agent: AgentRow,
+    pull: ReviewPull,
+    agent: ReviewAgent,
     grounding: string,
     durationMs = 0,
   ): RunTrace {

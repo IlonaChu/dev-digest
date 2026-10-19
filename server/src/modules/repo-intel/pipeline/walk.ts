@@ -17,12 +17,11 @@
  *     so the practical loss is small. TODO(T3): wire `ignore` once we accept
  *     a new dep, OR honor `git ls-files` so we get .gitignore for free.
  *
- * Pure-ish: takes a root path + does fs ops; returns plain data so the caller
- * (full.ts / incremental.ts) can decide what to do with it.
+ * Disk access goes through the `SourceTree` port; returns plain data so the
+ * caller (full.ts / incremental.ts) can decide what to do with it.
  */
-import { readdir, stat } from 'node:fs/promises';
-import type { Dirent } from 'node:fs';
 import { extname, join, relative, sep } from 'node:path';
+import type { SourceTree } from '../ports.js';
 import {
   EXCLUDED_DIRS,
   MAX_FILE_SIZE,
@@ -52,11 +51,11 @@ export interface WalkResult {
  * Recursively walk `root`, returning the file set to parse + a small stats
  * object the pipeline persists into `repo_index_state.stats`.
  */
-export async function walkClone(root: string): Promise<WalkResult> {
+export async function walkClone(tree: SourceTree, root: string): Promise<WalkResult> {
   const out: string[] = [];
   const stats: WalkStats = { totalCandidates: 0, skippedTooLarge: 0, bounded: 0 };
 
-  await walkDir(root, root, out, stats);
+  await walkDir(tree, root, root, out, stats);
 
   // Stable order: alphabetical relpath. Keeps "first N when bounded" reproducible
   // across runs (until T3 replaces it with rank-driven selection).
@@ -71,31 +70,28 @@ export async function walkClone(root: string): Promise<WalkResult> {
 }
 
 async function walkDir(
+  tree: SourceTree,
   root: string,
   dir: string,
   out: string[],
   stats: WalkStats,
 ): Promise<void> {
-  let entries: Dirent[];
-  try {
-    entries = (await readdir(dir, { withFileTypes: true })) as Dirent[];
-  } catch {
-    // Unreadable directory (permissions, dangling symlink) — skip cleanly so
-    // the indexer keeps making progress on the parts of the clone it CAN read.
-    return;
-  }
+  // Unreadable directory (permissions, dangling symlink) — skip cleanly so
+  // the indexer keeps making progress on the parts of the clone it CAN read.
+  const entries = await tree.list(dir);
+  if (!entries) return;
 
   for (const entry of entries) {
-    if (entry.isSymbolicLink()) continue; // never follow symlinks (loops, perf)
+    if (entry.kind === 'symlink') continue; // never follow symlinks (loops, perf)
     const name = entry.name;
 
-    if (entry.isDirectory()) {
+    if (entry.kind === 'dir') {
       if (EXCLUDED_SET.has(name)) continue;
-      await walkDir(root, join(dir, name), out, stats);
+      await walkDir(tree, root, join(dir, name), out, stats);
       continue;
     }
 
-    if (!entry.isFile()) continue;
+    if (entry.kind !== 'file') continue;
 
     const ext = extname(name).toLowerCase();
     if (!SUPPORTED_SET.has(ext)) continue;
@@ -103,12 +99,8 @@ async function walkDir(
     stats.totalCandidates += 1;
 
     const full = join(dir, name);
-    let size: number;
-    try {
-      size = (await stat(full)).size;
-    } catch {
-      continue;
-    }
+    const size = await tree.size(full);
+    if (size === null) continue;
     if (size > MAX_FILE_SIZE) {
       stats.skippedTooLarge += 1;
       continue;

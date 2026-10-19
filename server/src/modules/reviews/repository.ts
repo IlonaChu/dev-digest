@@ -14,9 +14,39 @@ import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
  */
 
 import type { FindingRow, PullRow } from '../../db/rows.js';
+import type { PersistedRun, ReviewPull, ReviewRepoRef } from './types.js';
 export type { FindingRow, PullRow };
 
 export type ReviewRow = typeof t.reviews.$inferSelect;
+
+export interface ReviewInsert {
+  workspaceId: string;
+  prId: string;
+  agentId: string | null;
+  runId: string | null;
+  kind: 'summary' | 'review';
+  verdict: string | null;
+  summary: string | null;
+  score: number | null;
+  model: string | null;
+}
+
+export interface RunCompletion {
+  status: 'done' | 'failed' | 'cancelled';
+  durationMs: number;
+  tokensIn: number;
+  tokensOut: number;
+  /** Run cost in USD; null/omitted when unknown (never 0 for "no data"). */
+  costUsd?: number | null;
+  findingsCount: number;
+  grounding: string;
+  /** Review score (0-100); null on failed/cancelled runs. */
+  score?: number | null;
+  /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */
+  blockers?: number | null;
+  /** Failure reason (status='failed') / cancellation note. Null clears it. */
+  error?: string | null;
+}
 
 import * as reviewRepo from './repository/review.repo.js';
 import * as runRepo from './repository/run.repo.js';
@@ -27,36 +57,52 @@ export class ReviewRepository {
 
   // ---- PR lookup (workspace-scoped) --------------------------------------
 
-  getPull(workspaceId: string, prId: string): Promise<PullRow | undefined> {
+  getPull(workspaceId: string, prId: string): Promise<ReviewPull | undefined> {
     return pullRepo.getPull(this.db, workspaceId, prId);
   }
 
-  getRepo(repoId: string): Promise<typeof t.repos.$inferSelect | undefined> {
+  getRepo(repoId: string): Promise<ReviewRepoRef | undefined> {
     return pullRepo.getRepo(this.db, repoId);
   }
 
-  getPrFiles(prId: string): Promise<(typeof t.prFiles.$inferSelect)[]> {
+  getPrFiles(prId: string): Promise<{ path: string; patch: string | null }[]> {
     return pullRepo.getPrFiles(this.db, prId);
   }
 
   // ---- reviews + findings -------------------------------------------------
 
-  insertReview(values: {
-    workspaceId: string;
-    prId: string;
-    agentId: string | null;
-    runId: string | null;
-    kind: 'summary' | 'review';
-    verdict: string | null;
-    summary: string | null;
-    score: number | null;
-    model: string | null;
-  }): Promise<ReviewRow> {
+  insertReview(values: ReviewInsert): Promise<ReviewRow> {
     return reviewRepo.insertReview(this.db, values);
   }
 
   insertFindings(reviewId: string, findings: Finding[]): Promise<FindingRow[]> {
     return reviewRepo.insertFindings(this.db, reviewId, findings);
+  }
+
+  /**
+   * Persist a successful run in ONE transaction: the review + its findings,
+   * the PR's reviewed head SHA and the `agent_runs` completion — so a crash
+   * can't leave a 'running' run with a saved review, or a reviewed PR without
+   * its findings. `findingsCount` is taken from the inserted rows.
+   */
+  persistRunOutcome(input: {
+    runId: string;
+    review: ReviewInsert;
+    findings: Finding[];
+    headSha: string;
+    completion: Omit<RunCompletion, 'status' | 'findingsCount'>;
+  }): Promise<PersistedRun> {
+    return this.db.transaction(async (tx) => {
+      const review = await reviewRepo.insertReview(tx, input.review);
+      const findings = await reviewRepo.insertFindings(tx, review.id, input.findings);
+      await pullRepo.markReviewed(tx, input.review.prId, input.headSha);
+      await runRepo.completeAgentRun(tx, input.runId, {
+        ...input.completion,
+        status: 'done',
+        findingsCount: findings.length,
+      });
+      return { reviewId: review.id, findingsCount: findings.length };
+    });
   }
 
   /** Reviews for a PR (newest first), each with its findings. */
@@ -148,25 +194,7 @@ export class ReviewRepository {
     return runRepo.createAgentRun(this.db, values);
   }
 
-  completeAgentRun(
-    runId: string,
-    values: {
-      status: 'done' | 'failed' | 'cancelled';
-      durationMs: number;
-      tokensIn: number;
-      tokensOut: number;
-      /** Run cost in USD; null/omitted when unknown (never 0 for "no data"). */
-      costUsd?: number | null;
-      findingsCount: number;
-      grounding: string;
-      /** Review score (0-100); null on failed/cancelled runs. */
-      score?: number | null;
-      /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */
-      blockers?: number | null;
-      /** Failure reason (status='failed') / cancellation note. Null clears it. */
-      error?: string | null;
-    },
-  ): Promise<void> {
+  completeAgentRun(runId: string, values: RunCompletion): Promise<void> {
     return runRepo.completeAgentRun(this.db, runId, values);
   }
 

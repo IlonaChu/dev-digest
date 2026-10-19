@@ -1,8 +1,108 @@
-/* hooks/ barrel — every React Query hook over the F1/feature APIs.
-   Import from "@/lib/hooks" for the platform hooks (settings/repos/pulls/context)
-   or from a domain file directly (e.g. "@/lib/hooks/reviews") — both resolve here. */
-export * from "./core";
-export * from "./agents";
-export * from "./reviews";
-export * from "./trace";
-export * from "./repo-intel";
+/* hooks/ public API — React Query hooks, query options and key factories over
+   the F1/feature APIs. Import from "@/lib/hooks" or from a domain file directly
+   (e.g. "@/lib/hooks/reviews"). Named re-exports only, so the surface is deliberate.
+   The domain files carry no "use client": hooks only run inside client components anyway,
+   and a directive would turn the key factories / queryOptions into client references that
+   a Server Component could not call for prefetching. */
+export {
+  settingsKeys,
+  settingsQuery,
+  secretsStatusQuery,
+  useSettings,
+  useUpdateSettings,
+  useTestConnection,
+  useSecretsStatus,
+  repoKeys,
+  reposQuery,
+  useRepos,
+  useAddRepo,
+  useRefreshRepo,
+  useDeleteRepo,
+  pullKeys,
+  pullsQuery,
+  pullDetailQuery,
+  usePulls,
+  usePullDetail,
+  contextKeys,
+  useContextFiles,
+  useReindexContext,
+} from "./core";
+export {
+  agentKeys,
+  agentsQuery,
+  agentQuery,
+  useAgents,
+  useAgent,
+  useCreateAgent,
+  useUpdateAgent,
+  useDeleteAgent,
+  useProviderModels,
+  type CreateAgentInput,
+  type UpdateAgentInput,
+} from "./agents";
+export {
+  skillKeys,
+  skillsQuery,
+  skillQuery,
+  skillVersionsQuery,
+  agentSkillLinksQuery,
+  useSkills,
+  useSkill,
+  useSkillVersions,
+  useAgentSkillLinks,
+  useCreateSkill,
+  useUpdateSkill,
+  useDeleteSkill,
+  useRestoreSkillVersion,
+  useRevetSkill,
+  useImportSkillPreview,
+  useImportSkill,
+  useFetchSkillFromUrl,
+  useSetAgentSkills,
+  type CreateSkillInput,
+  type UpdateSkillInput,
+  type SkillFilePayload,
+  type ImportSkillInput,
+  type AgentSkillLinkInput,
+} from "./skills";
+export {
+  reviewKeys,
+  prActiveRunsQuery,
+  prRunsQuery,
+  prReviewsQuery,
+  usePrActiveRuns,
+  usePrRuns,
+  usePrReviews,
+  useRunLifecycle,
+  useDeleteRun,
+  useCancelRun,
+  useDeleteReview,
+  usePrComments,
+  useCreatePrComment,
+  useRunReview,
+  useFindingAction,
+  useRunEvents,
+  type ActiveRun,
+  type CreateCommentInput,
+  type RunReviewInput,
+} from "./reviews";
+export {
+  conventionKeys,
+  conventionsQuery,
+  useRejectConvention,
+  useConventions,
+  useExtractConventions,
+  useUpdateConvention,
+  useSetAllConventions,
+  useConventionSkillDraft,
+  useCreateConventionSkill,
+  type UpdateConventionInput,
+  type CreateConventionSkillInput,
+} from "./conventions";
+export { traceKeys, runTraceQuery, useRunTrace } from "./trace";
+export {
+  repoIntelKeys,
+  useRepoIntelStatus,
+  useResyncRepoIntel,
+  type RepoIntelState,
+} from "./repo-intel";

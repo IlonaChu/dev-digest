@@ -3,11 +3,11 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { FormField, SearchableSelect, Icon } from "@devdigest/ui";
-import { useSettings, useUpdateSettings } from "../../../../../../../lib/hooks";
-import { useProviderModels } from "../../../../../../../lib/hooks/agents";
-import { toModelOptions } from "../../../../../../../lib/model-label";
-import { FEATURE_MODELS } from "../../../../../../../lib/feature-models";
-import type { FeatureModelChoice, FeatureModelId } from "../../../../../../../lib/types";
+import { useSettings, useUpdateSettings } from "@/lib/hooks";
+import { useProviderModels } from "@/lib/hooks/agents";
+import { toModelOptions } from "@/lib/model-label";
+import { FEATURE_MODELS } from "@/lib/feature-models";
+import type { FeatureModelChoice, FeatureModelId } from "@/lib/types";
 import { SectionTitle } from "../SectionTitle";
 import { s } from "./styles";
 
@@ -49,11 +49,11 @@ export function SettingsModels() {
             <FormField
               label={
                 <>
-                  {f.label}
+                  {t(`models.features.${f.id}.label`)}
                   {isDefault && <span style={s.defaultTag}>{t("models.usingDefault")}</span>}
                 </>
               }
-              hint={f.description}
+              hint={t(`models.features.${f.id}.description`)}
             >
               <SearchableSelect
                 value={current}

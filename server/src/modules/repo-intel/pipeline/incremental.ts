@@ -14,13 +14,10 @@
  * invalidated and re-rendered. Option B: rank = PageRank, hotness=0.
  */
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { extname } from 'node:path';
 import type { RepoRef } from '@devdigest/shared';
 import type { Container } from '../../../platform/container.js';
 import { withTimeout } from '../../../platform/resilience.js';
-import { parseSymbols, parseReferences, langForFile } from '../../../adapters/astgrep/index.js';
-import { extractEndpoints, extractCrons } from '../../../adapters/codeindex/extract.js';
 import {
   DEFAULT_REPO_MAP_TOKEN_BUDGET,
   INDEXER_VERSION,
@@ -143,15 +140,15 @@ export async function runIncremental(
   let filesSkipped = 0;
   const parseDegraded: Array<{ file: string; reason: string }> = [];
 
+  const { codeParser, sourceTree } = container;
   for (const relPath of changed) {
-    const lang = langForFile(relPath);
-    if (!lang) {
+    if (!codeParser.supports(relPath)) {
       filesSkipped += 1;
       continue;
     }
     let source: string;
     try {
-      source = await readFile(join(repo.clonePath, relPath), 'utf8');
+      source = await sourceTree.read(repo.clonePath, relPath);
     } catch (err) {
       // File was deleted between the diff and the read — count as skipped
       // (its old rows still get cleared below).
@@ -163,8 +160,8 @@ export async function runIncremental(
     try {
       const parsed = await withTimeout(
         Promise.resolve().then(() => ({
-          symbols: parseSymbols(relPath, source),
-          references: parseReferences(relPath, source),
+          symbols: codeParser.parseSymbols(relPath, source),
+          references: codeParser.parseReferences(relPath, source),
         })),
         MAX_PARSE_MS_PER_FILE,
       );
@@ -190,8 +187,8 @@ export async function runIncremental(
           contentHash,
         });
       }
-      const endpoints = extractEndpoints(source);
-      const crons = extractCrons(source);
+      const endpoints = codeParser.extractEndpoints(source);
+      const crons = codeParser.extractCrons(source);
       if (endpoints.length > 0 || crons.length > 0) {
         factsBuf.push({ filePath: relPath, endpoints, crons });
       }
@@ -202,9 +199,7 @@ export async function runIncremental(
     }
   }
 
-  await repository.deleteForFiles(repoId, changed);
-  await repository.insertSymbols(symbolsBuf);
-  await repository.insertReferences(refsBuf);
+  await repository.rewriteSymbols(repoId, changed, symbolsBuf, refsBuf);
   await repository.patchFileFacts(repoId, changed, factsBuf);
 
   // --- T3: rebuild graph + rank, re-resolve, invalidate the repo-map -----
@@ -215,7 +210,7 @@ export async function runIncremental(
   let graphFailed: string | undefined;
   let edgeRows: IndexerEdgeRow[] = [];
   try {
-    const allFiles = (await walkClone(repo.clonePath)).files;
+    const allFiles = (await walkClone(sourceTree, repo.clonePath)).files;
     const edges = await container.depgraph.buildEdges(repo.clonePath, allFiles);
     edgeRows = edges.map((e) => ({ fromFile: e.from, toFile: e.to }));
     await repository.replaceEdges(repoId, edgeRows);

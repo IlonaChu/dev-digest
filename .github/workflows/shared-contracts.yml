@@ -1,0 +1,29 @@
+# Shared contracts — server/src/vendor/shared is canonical, client/src/vendor/shared is a copy.
+# Fails when the copies drift; fix locally with ./scripts/sync-shared.sh.
+name: shared-contracts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/src/vendor/shared/**'
+      - 'client/src/vendor/shared/**'
+      - 'scripts/sync-shared.sh'
+      - '.github/workflows/shared-contracts.yml'
+  pull_request:
+    paths:
+      - 'server/src/vendor/shared/**'
+      - 'client/src/vendor/shared/**'
+      - 'scripts/sync-shared.sh'
+      - '.github/workflows/shared-contracts.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: copies in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/sync-shared.sh --check

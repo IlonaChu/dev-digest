@@ -61,7 +61,7 @@ No `chat`, no model key.
 ```sh
 # per package
 cd client        && pnpm test           # + pnpm typecheck
-cd reviewer-core && npm test
+cd reviewer-core && pnpm test
 
 # server — the unit/integration split (see note below)
 cd server && pnpm exec vitest run --exclude '**/*.it.test.ts'   # unit, no Docker
@@ -71,7 +71,7 @@ cd server && pnpm test                                          # both
 # browser e2e (needs the full stack + agent-browser CLI)
 ./scripts/dev.sh
 npm i -g agent-browser && agent-browser install
-cd e2e && npm install && npm test
+cd e2e && pnpm install && pnpm test
 ```
 
 ## Conventions
@@ -86,6 +86,9 @@ cd e2e && npm install && npm test
   `test:integration` scripts.
 - **Hermetic by default.** Reach for `src/adapters/mocks.ts` (MockLLMProvider,
   MockGitClient) rather than real network/keys.
+- **Layer rules are tests.** `server/test/architecture.test.ts` (dependency-cruiser
+  against a legacy baseline) and `reviewer-core/test/architecture.test.ts` (pure-core
+  imports) run in the unit lanes; see the `onion-architecture` skill.
 - **E2E specs are deterministic batch JSON** (`e2e/specs/*.flow.json`) using
   only `--url` / `--text` / `find` locators — never the AI `chat` command.
 - **CI is path-filtered per package.** Cross-package source aliases are encoded

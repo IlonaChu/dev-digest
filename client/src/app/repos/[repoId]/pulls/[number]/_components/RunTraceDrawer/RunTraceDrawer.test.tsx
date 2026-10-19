@@ -72,4 +72,28 @@ describe("A5 Run Trace drawer (smoke)", () => {
     expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
     expect(screen.getByText("—", { selector: ".tnum" })).toBeInTheDocument();
   });
+
+  it("labels the skills block with the skill count, token total and one chip per skill", () => {
+    currentTrace = {
+      ...TRACE,
+      prompt_assembly: {
+        ...TRACE.prompt_assembly,
+        skills_meta: [
+          { id: "s1", name: "untested-branches", version: 2, tokens: 120 },
+          { id: "s2", name: "edge-case-checklist", version: 1, tokens: 80 },
+        ],
+      },
+    };
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    fireEvent.click(screen.getByText("Prompt assembly"));
+    expect(screen.getByText("Skills (dynamic) · 2 skills · 200 tokens")).toBeInTheDocument();
+    expect(screen.getByText("untested-branches v2 · 120")).toBeInTheDocument();
+    expect(screen.getByText("edge-case-checklist v1 · 80")).toBeInTheDocument();
+  });
+
+  it("keeps the plain skills label when the trace has no per-skill breakdown", () => {
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    fireEvent.click(screen.getByText("Prompt assembly"));
+    expect(screen.getByText("Skills (dynamic)")).toBeInTheDocument();
+  });
 });

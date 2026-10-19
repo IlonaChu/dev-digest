@@ -25,6 +25,8 @@ import type { RepoIntelRepository } from '../src/modules/repo-intel/repository.j
 import { INDEXER_VERSION } from '../src/modules/repo-intel/constants.js';
 import type { IndexState } from '../src/modules/repo-intel/types.js';
 import type { Container } from '../src/platform/container.js';
+import { NodeSourceTree } from '../src/adapters/fs/node-source-tree.js';
+import { AstGrepCodeParser } from '../src/adapters/astgrep/code-parser.js';
 
 // ---------------------------------------------------------------------------
 // In-memory repository stub — matches RepoIntelRepository's surface.
@@ -48,26 +50,28 @@ function makeRepoStub(opts: {
   const stub = {
     getRepoBasics: async () => opts.basics,
     tryGetIndexState: async () => state,
-    deleteAllForRepo: async () => {
-      symbols.length = 0;
-      references.length = 0;
-    },
-    deleteForFiles: async (_repoId: string, paths: string[]) => {
-      const set = new Set(paths);
-      for (let i = symbols.length - 1; i >= 0; i--) {
-        if (set.has((symbols[i] as { path: string }).path)) symbols.splice(i, 1);
-      }
-      for (let i = references.length - 1; i >= 0; i--) {
-        if (set.has((references[i] as { fromPath: string }).fromPath)) {
-          references.splice(i, 1);
+    rewriteSymbols: async (
+      _repoId: string,
+      paths: 'all' | string[],
+      newSymbols: unknown[],
+      newReferences: unknown[],
+    ) => {
+      if (paths === 'all') {
+        symbols.length = 0;
+        references.length = 0;
+      } else {
+        const set = new Set(paths);
+        for (let i = symbols.length - 1; i >= 0; i--) {
+          if (set.has((symbols[i] as { path: string }).path)) symbols.splice(i, 1);
+        }
+        for (let i = references.length - 1; i >= 0; i--) {
+          if (set.has((references[i] as { fromPath: string }).fromPath)) {
+            references.splice(i, 1);
+          }
         }
       }
-    },
-    insertSymbols: async (rows: unknown[]) => {
-      symbols.push(...rows);
-    },
-    insertReferences: async (rows: unknown[]) => {
-      references.push(...rows);
+      symbols.push(...newSymbols);
+      references.push(...newReferences);
     },
     upsertIndexState: async (s: {
       repoId: string;
@@ -134,6 +138,8 @@ function makeContainer(git: MiniGit): Container {
     // T3 adapters — stubbed: empty graph (rank degrades to flat) + char/4 tokens.
     depgraph: { buildEdges: async () => [] },
     tokenizer: { count: (text: string) => Math.ceil(text.length / 4) },
+    sourceTree: new NodeSourceTree(),
+    codeParser: new AstGrepCodeParser(),
   } as unknown as Container;
 }
 

@@ -1,7 +1,6 @@
 import type { Container } from '../../platform/container.js';
 import { type Repo } from '@devdigest/shared';
 import { NotFoundError } from '../../platform/errors.js';
-import { RepoRepository } from './repository.js';
 import { parseRepoUrl, withGitHubToken, toRepoDto } from './helpers.js';
 import {
   CLONE_JOB_KIND,
@@ -11,14 +10,14 @@ import {
 import {
   INDEX_JOB_KIND,
   REFRESH_JOB_KIND,
-} from '../repo-intel/constants.js';
+} from '../_shared/job-kinds.js';
 
 /**
  * F1 — repos service. Business logic for the Repositories feature:
  *   - add / list / refresh / remove
  *   - the asynchronous `clone` job (real `git clone` via the GitClient adapter)
  *
- * No HTTP and no raw SQL live here — persistence goes through RepoRepository,
+ * No HTTP and no raw SQL live here — persistence goes through `container.reposRepo`,
  * pure transforms through helpers.ts, literals through constants.ts.
  */
 
@@ -31,10 +30,10 @@ export interface CloneJobPayload {
 }
 
 export class RepoService {
-  private repo: RepoRepository;
+  constructor(private container: Container) {}
 
-  constructor(private container: Container) {
-    this.repo = new RepoRepository(container.db);
+  private get repo() {
+    return this.container.reposRepo;
   }
 
   /**

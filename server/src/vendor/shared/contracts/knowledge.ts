@@ -115,8 +115,38 @@ export type MemoryItem = z.infer<typeof MemoryItem>;
 export const SkillType = z.enum(['rubric', 'convention', 'security', 'custom']);
 export type SkillType = z.infer<typeof SkillType>;
 
-export const SkillSource = z.enum(['manual', 'imported_url', 'extracted', 'community']);
+export const SkillSource = z.enum(['manual', 'imported', 'imported_url', 'extracted', 'community']);
 export type SkillSource = z.infer<typeof SkillSource>;
+
+// Vetting of an IMPORTED skill (someone else's instructions that end up in an
+// agent's prompt). Only `clean` may be enabled; every other status blocks it.
+export const SkillVettingStatus = z.enum(['clean', 'suspicious', 'malicious', 'unverified']);
+export type SkillVettingStatus = z.infer<typeof SkillVettingStatus>;
+
+export const SkillVettingFinding = z.object({
+  /** Hard rule that fired (always blocks); soft heuristics only hint the LLM. */
+  rule: z.string(),
+  message: z.string(),
+  line: z.number().int().nullish(),
+  excerpt: z.string().nullish(),
+});
+export type SkillVettingFinding = z.infer<typeof SkillVettingFinding>;
+
+export const SkillVetting = z.object({
+  status: SkillVettingStatus,
+  findings: z.array(SkillVettingFinding),
+  llm: z
+    .object({
+      verdict: z.enum(['clean', 'suspicious', 'malicious']),
+      reasons: z.array(z.string()),
+      model: z.string(),
+    })
+    .nullable(),
+  /** Skill version the check ran against — a body edit invalidates it. */
+  version: z.number().int(),
+  checked_at: z.string(),
+});
+export type SkillVetting = z.infer<typeof SkillVetting>;
 
 export const Skill = z.object({
   id: z.string(),
@@ -128,6 +158,10 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  /** Imported skills only; null for skills written in the product. */
+  vetting: SkillVetting.nullish(),
+  /** How many agents have this skill linked (list/detail only). */
+  agent_count: z.number().int().optional(),
 });
 export type Skill = z.infer<typeof Skill>;
 
@@ -140,16 +174,48 @@ export const CommunitySkill = z.object({
 });
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
 
-// ---- Conventions ----
-export const ConventionCandidate = z.object({
-  id: z.string(),
-  rule: z.string(),
-  evidence_path: z.string(),
-  evidence_snippet: z.string(),
-  confidence: z.number().min(0).max(1),
-  accepted: z.boolean(),
+/** Immutable snapshot written whenever a skill's body or description changes. */
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  body: z.string(),
+  description: z.string(),
+  message: z.string().nullable(),
+  created_at: z.string(),
 });
-export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+/** A file inside an imported archive that is listed but never read or run. */
+export const SkillIgnoredFile = z.object({
+  path: z.string(),
+  executable: z.boolean(),
+});
+export type SkillIgnoredFile = z.infer<typeof SkillIgnoredFile>;
+
+/** What an import WOULD create. Returned by the preview step; nothing is stored. */
+export const SkillImportPreview = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  ignored_files: z.array(SkillIgnoredFile),
+  vetting: SkillVetting,
+  /** True when a skill with this name already exists in the workspace. */
+  name_taken: z.boolean(),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
+
+/**
+ * A skill file the server downloaded from a URL — the same payload the file
+ * import takes, so preview/confirm run unchanged. Nothing is stored.
+ */
+export const SkillImportFile = z.object({
+  filename: z.string(),
+  content_base64: z.string(),
+  /** The URL that was fetched (a GitHub file page is rewritten to its raw file). */
+  source_url: z.string(),
+});
+export type SkillImportFile = z.infer<typeof SkillImportFile>;
 
 // ---- Agents ----
 // 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a
@@ -195,6 +261,8 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  /** Per-agent switch; the skill reaches the prompt only if this AND `Skill.enabled`. */
+  enabled: z.boolean().default(true),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
 

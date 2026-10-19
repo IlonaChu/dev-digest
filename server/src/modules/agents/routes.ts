@@ -25,7 +25,7 @@ const VersionParams = z.object({
  *   GET    /agents/:id/versions     → config history (newest first)
  *   GET    /agents/:id/versions/:version → one config snapshot
  *   GET    /agents/:id/skills       → linked skills (ordered)
- *   POST   /agents/:id/skills       → set/reorder linked skills OR link one
+ *   POST   /agents/:id/skills       → set/reorder/toggle linked skills ({links}) OR link one
  *   GET    /agents/:id/models       → dynamic model list for the agent's provider
  *   GET    /providers/:id/models    → dynamic model list for a provider (editor)
  */
@@ -56,15 +56,20 @@ const UpdateAgentBody = z.object({
   enabled: z.boolean().optional(),
 });
 
-/** Either set the whole ordered set (`skill_ids`) or link one (`skill_id`). */
+/**
+ * Set the whole ordered set — `links` (with per-agent `enabled`) or the legacy
+ * `skill_ids` — or link one (`skill_id`).
+ */
 const SetSkillsBody = z
   .object({
+    links: z.array(z.object({ skill_id: z.string().uuid(), enabled: z.boolean().optional() })).optional(),
     skill_ids: z.array(z.string().uuid()).optional(),
     skill_id: z.string().uuid().optional(),
     order: z.number().int().optional(),
+    enabled: z.boolean().optional(),
   })
-  .refine((b) => b.skill_ids !== undefined || b.skill_id !== undefined, {
-    message: 'Provide skill_ids (set/reorder) or skill_id (link one)',
+  .refine((b) => b.links !== undefined || b.skill_ids !== undefined || b.skill_id !== undefined, {
+    message: 'Provide links or skill_ids (set/reorder) or skill_id (link one)',
   });
 
 export default async function agentsRoutes(appBase: FastifyInstance) {
@@ -155,10 +160,11 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
     async (req) => {
       const { workspaceId } = await getContext(app.container, req);
       const body = req.body;
-      const links =
-        body.skill_ids !== undefined
-          ? await service.setSkills(workspaceId, req.params.id, body.skill_ids)
-          : await service.linkSkill(workspaceId, req.params.id, body.skill_id!, body.order);
+      const requested =
+        body.links ?? body.skill_ids?.map((skill_id) => ({ skill_id }));
+      const links = requested
+        ? await service.setSkills(workspaceId, req.params.id, requested)
+        : await service.linkSkill(workspaceId, req.params.id, body.skill_id!, body.order, body.enabled);
       if (!links) throw new NotFoundError('Agent not found');
       return links;
     },

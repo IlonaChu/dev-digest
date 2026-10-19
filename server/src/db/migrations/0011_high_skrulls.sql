@@ -1,0 +1,1 @@
+ALTER TABLE "agent_runs" ADD CONSTRAINT "agent_runs_status_check" CHECK ("agent_runs"."status" in ('running', 'done', 'failed', 'cancelled'));

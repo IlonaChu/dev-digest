@@ -9,6 +9,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { walkClone } from '../src/modules/repo-intel/pipeline/walk.js';
+import { NodeSourceTree } from '../src/adapters/fs/node-source-tree.js';
 import {
   EXCLUDED_DIRS,
   MAX_FILE_SIZE,
@@ -21,6 +22,8 @@ async function writeFileAt(root: string, rel: string, contents: string): Promise
   if (dir && dir !== root) await mkdir(dir, { recursive: true });
   await writeFile(full, contents);
 }
+
+const tree = new NodeSourceTree();
 
 describe('walkClone', () => {
   let root: string;
@@ -37,7 +40,7 @@ describe('walkClone', () => {
     await writeFileAt(root, 'src/a.ts', 'export const a = 1;');
     await writeFileAt(root, 'src/c.tsx', 'export const C = () => null;');
 
-    const result = await walkClone(root);
+    const result = await walkClone(tree, root);
     expect(result.files).toEqual(['src/a.ts', 'src/b.ts', 'src/c.tsx']);
     expect(result.stats.totalCandidates).toBe(3);
     expect(result.stats.skippedTooLarge).toBe(0);
@@ -49,7 +52,7 @@ describe('walkClone', () => {
     await writeFileAt(root, 'data.json', '{}');
     await writeFileAt(root, 'src/index.ts', 'export {}');
 
-    const result = await walkClone(root);
+    const result = await walkClone(tree, root);
     expect(result.files).toEqual(['src/index.ts']);
   });
 
@@ -59,7 +62,7 @@ describe('walkClone', () => {
       await writeFileAt(root, `${d}/inside.ts`, 'export {}');
     }
 
-    const result = await walkClone(root);
+    const result = await walkClone(tree, root);
     expect(result.files).toEqual(['src/index.ts']);
     for (const d of EXCLUDED_DIRS) {
       expect(result.files.some((f) => f.startsWith(`${d}/`))).toBe(false);
@@ -73,7 +76,7 @@ describe('walkClone', () => {
     await writeFileAt(root, 'src/big.ts', bigContents);
     await writeFileAt(root, 'src/small.ts', 'export {}');
 
-    const result = await walkClone(root);
+    const result = await walkClone(tree, root);
     expect(result.files).toEqual(['src/small.ts']);
     expect(result.stats.skippedTooLarge).toBe(1);
     expect(result.stats.totalCandidates).toBe(2);
@@ -91,7 +94,7 @@ describe('walkClone', () => {
     for (let i = 0; i < N; i++) {
       await writeFileAt(root, `src/f${String(i).padStart(2, '0')}.ts`, 'export {}');
     }
-    const result = await walkClone(root);
+    const result = await walkClone(tree, root);
     expect(result.files.length).toBe(N);
     expect(result.stats.bounded).toBe(0);
     // sanity: MAX_INDEXED_FILES is the documented ceiling
@@ -103,8 +106,8 @@ describe('walkClone', () => {
     // We don't create a symlink (cross-platform pain in CI); just verify
     // walkClone is idempotent and that adding a regular file later does not
     // pull in extra entries.
-    const first = await walkClone(root);
-    const second = await walkClone(root);
+    const first = await walkClone(tree, root);
+    const second = await walkClone(tree, root);
     expect(first.files).toEqual(second.files);
   });
 });

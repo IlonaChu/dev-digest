@@ -29,7 +29,7 @@ The file belongs to the package the insight is **about**, not the one you happen
 
 - A task spanning several packages → one entry per package, each in its own file; don't duplicate across files, cross-reference instead (`see client/INSIGHTS.md`).
 - `src/vendor/shared` drift touches `server` and `client` → record it where the surprise happened.
-- Never write into `server/clones/`, `server/src/db/migrations/`, `.env*`, `pnpm-lock.yaml`. Never edit CLAUDE.md or docs from this skill — promoting an insight to a rule is the human's call.
+- Never write into `server/clones/`, `server/src/db/migrations/`, `.env*`, `pnpm-lock.yaml`. Never edit AGENTS.md/CLAUDE.md or docs from this skill — promoting an insight to a rule is the human's call.
 - If the package's `INSIGHTS.md` is missing, create it from the skeleton at the bottom.
 
 ## Which section
@@ -51,7 +51,7 @@ The HTML comment under each heading is the criterion — read it before writing.
 Write the entry only if **all** hold:
 
 1. **Not obvious** to someone reading the code. If it would be obvious, don't write it.
-2. **Not already recorded** — `grep` the file, the package CLAUDE.md and the root CLAUDE.md. If a near-duplicate exists, add a dated follow-up instead of a second bullet.
+2. **Not already recorded** — `grep` the file, the package AGENTS.md and the root AGENTS.md. If a near-duplicate exists, add a dated follow-up instead of a second bullet.
 3. **Actionable cold** — a future agent with zero context knows what to do. It names a file, function, command, flag or number.
 4. **Verified** — you saw it happen. Otherwise it goes to *Open Questions*, labelled as unverified.
 5. **Changes behaviour** — a future session would act differently because of it.
@@ -102,7 +102,7 @@ Format: `- YYYY-MM-DD — <specific fact> → <what to do> (<evidence>)`. One or
 <!-- Dead ends, abandoned approaches, the agent's repeated wrong defaults — and why. Most skipped, most valuable. -->
 
 ## Codebase Patterns
-<!-- Conventions and architecture decisions (with the reason) not stated in CLAUDE.md -->
+<!-- Conventions and architecture decisions (with the reason) not stated in AGENTS.md -->
 
 ## Tool & Library Notes
 <!-- Dependency/tool quirks, version-specific behaviour -->

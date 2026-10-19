@@ -18,11 +18,11 @@
  * `parseChangedFiles` helper (which reads files diff-scoped under `root`).
  */
 import { parse, Lang, type SgNode } from '@ast-grep/napi';
-import { readFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { extname } from 'node:path';
+import { readFileInsideRoot } from '../fs/safe-read.js';
 
 import type { ExtractedReference, ExtractedSymbol } from '../codeindex/extract.js';
-import { MAX_SIGNATURE_CHARS, SUPPORTED_EXT } from '../../modules/repo-intel/constants.js';
+import { MAX_SIGNATURE_CHARS, SUPPORTED_EXT } from '../../platform/code-index-scope.js';
 
 // ---------------------------------------------------------------------------
 // Public types — superset of the regex extractor's row shapes.
@@ -618,7 +618,7 @@ export async function parseChangedFiles(
 
     let source: string;
     try {
-      source = await readFile(join(root, rel), 'utf8');
+      source = await readFileInsideRoot(root, rel);
     } catch {
       continue;
     }

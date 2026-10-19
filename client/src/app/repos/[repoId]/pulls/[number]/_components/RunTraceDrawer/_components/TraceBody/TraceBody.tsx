@@ -19,6 +19,18 @@ import { Row, Stat } from "../atoms";
 export function TraceBody({ trace, findings }: { trace: RunTrace; findings: FindingRecord[] }) {
   const t = useTranslations("runs");
   const stats = trace.stats;
+  const skillsMeta = trace.prompt_assembly.skills_meta ?? [];
+  // Name how many skills went in and what they cost, so the skills block is auditable.
+  const skillsLabel =
+    skillsMeta.length > 0
+      ? `${t("trace.prompt.skills")} · ${t("trace.prompt.skillsMeta", {
+          count: skillsMeta.length,
+          tokens: skillsMeta.reduce((n, m) => n + m.tokens, 0),
+        })}`
+      : t("trace.prompt.skills");
+  const skillChips = skillsMeta.map((m) =>
+    t("trace.prompt.skillChip", { name: m.name, version: m.version, tokens: m.tokens }),
+  );
   return (
     <>
       <TraceSection icon="Settings" title={t("trace.configuration")}>
@@ -74,7 +86,12 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
       <TraceSection icon="FileText" title={t("trace.promptAssembly")} defaultOpen={false}>
         <PromptBlock label={t("trace.prompt.system")} text={trace.prompt_assembly.system} color={PROMPT_COLORS.system} />
         {trace.prompt_assembly.skills != null && (
-          <PromptBlock label={t("trace.prompt.skills")} text={trace.prompt_assembly.skills} color={PROMPT_COLORS.skills} />
+          <PromptBlock
+            label={skillsLabel}
+            text={trace.prompt_assembly.skills}
+            color={PROMPT_COLORS.skills}
+            chips={skillChips}
+          />
         )}
         {trace.prompt_assembly.memory != null && (
           <PromptBlock label={t("trace.prompt.memory")} text={trace.prompt_assembly.memory} color={PROMPT_COLORS.memory} />

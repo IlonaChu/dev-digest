@@ -1,13 +1,11 @@
-import type { IconName } from "@devdigest/ui";
-
 /** Editor tab descriptor. `labelKey` resolves under the `agents` namespace. */
 export interface EditorTab {
   key: string;
   labelKey: string;
-  icon: IconName;
 }
 
-/** Editor tabs. Part-0 ships Config only; later lessons add the rest. */
+/** Editor tabs. Evals/Stats/CI arrive with later lessons. */
 export const TABS: readonly EditorTab[] = [
-  { key: "config", labelKey: "editor.tabs.config", icon: "Settings" },
+  { key: "config", labelKey: "editor.tabs.config" },
+  { key: "skills", labelKey: "editor.tabs.skills" },
 ];

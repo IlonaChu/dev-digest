@@ -1,0 +1,51 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for ImportReview (the "read before you save" step of an import). */
+export const s = {
+  wrap: { display: "flex", flexDirection: "column", gap: 18 } satisfies CSSProperties,
+  sourceRow: { display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-secondary)" } satisfies CSSProperties,
+  sourceLabel: {
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
+  trust: {
+    display: "flex",
+    gap: 10,
+    padding: 12,
+    borderRadius: 8,
+    border: "1px solid var(--warn)",
+    background: "var(--warn-bg)",
+    fontSize: 13,
+    lineHeight: 1.45,
+  } satisfies CSSProperties,
+  trustTitle: { fontWeight: 700, display: "block", marginBottom: 2 } satisfies CSSProperties,
+  grid: { display: "grid", gridTemplateColumns: "1fr 180px", gap: 14 } satisfies CSSProperties,
+  bodyBox: {
+    maxHeight: 260,
+    overflow: "auto",
+    padding: "10px 14px",
+    borderRadius: 7,
+    border: "1px solid var(--border)",
+    background: "var(--bg-elevated)",
+    fontSize: 13,
+  } satisfies CSSProperties,
+  ignored: {
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    padding: 12,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  } satisfies CSSProperties,
+  ignoredTitle: { fontSize: 13, fontWeight: 600 } satisfies CSSProperties,
+  ignoredNote: { fontSize: 12, color: "var(--text-muted)", lineHeight: 1.45 } satisfies CSSProperties,
+  ignoredList: { margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 } satisfies CSSProperties,
+  ignoredItem: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 } satisfies CSSProperties,
+  confirm: { display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, cursor: "pointer" } satisfies CSSProperties,
+  warning: { fontSize: 13, color: "var(--warn)" } satisfies CSSProperties,
+} as const;

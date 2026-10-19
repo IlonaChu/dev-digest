@@ -1,0 +1,46 @@
+# server — @devdigest/api
+
+Fastify API (:3001) + Drizzle/Postgres. API map + diagrams: [README.md](README.md)
+
+## Commands (run in server/)
+```sh
+pnpm dev                                              # tsx watch
+pnpm typecheck
+pnpm test                                             # all (integration needs Docker)
+pnpm exec vitest run --exclude '**/*.it.test.ts'      # unit only, hermetic
+pnpm exec vitest run .it.test                         # integration only (testcontainers)
+pnpm db:generate && pnpm db:migrate                   # after editing src/db/schema/*
+pnpm arch:check                                       # layer rules (also run by pnpm test)
+```
+
+## Where things live
+- `src/modules/<feature>/` — `routes.ts` → `service.ts` → `repository.ts`
+- `src/adapters/` — the outside world (GitHub, git, LLM, ast-grep, secrets); test doubles in `adapters/mocks.ts`
+- `src/platform/` — DI `Container`, config, SSE run bus, jobs, errors
+- `src/db/schema/` — Drizzle tables (some already exist for future lessons)
+- `src/modules/repo-intel/` — codebase indexer; see its [README.md](src/modules/repo-intel/README.md)
+
+## Conventions
+- ESM: relative imports end in `.js`, even for `.ts` files.
+- Get adapters from the `Container`; never `new` them in services. Tests swap them via `overrides`.
+- Secrets only through `SecretsProvider` (`adapters/secrets/local.ts`), never `process.env`.
+- Throw `AppError` / `NotFoundError` / … from `platform/errors.ts`; the error handler builds the response.
+- Only `*.it.test.ts` may touch a real DB; every other test must stay hermetic (no network, no keys).
+- Review logic belongs in `reviewer-core`; the server only resolves context, persists and streams.
+- Onion layering is enforced: only `repository*` touches Drizzle, modules use ports via the `Container`,
+  SDKs live in `adapters/` (`.dependency-cruiser.cjs`, `test/architecture.test.ts`). Legacy violations sit in
+  `.dependency-cruiser-known-violations.json` — never regenerate it to pass a new one.
+
+## Gotchas
+- Migrations are NOT applied on boot — run `pnpm db:migrate`.
+- On boot, runs stuck in `running` are marked failed (assumes a single API instance per DB).
+- `clones/` holds cloned target repos — not our code.
+
+## Read When
+- [docs/architecture.md](docs/architecture.md) — touching the DI `Container`, adapters, modules or `platform/`
+- [specs/review-flow.md](specs/review-flow.md) — touching reviews, `run-executor`, run status, SSE or the pulls routes
+- [specs/L01-run-cost-badge.md](specs/L01-run-cost-badge.md) — touching cost (`cost_usd`) or the PR list rollup
+- [specs/L02-skills.md](specs/L02-skills.md) — touching skills, agent skill links, import/vetting or the prompt skills block
+- [specs/L02-conventions.md](specs/L02-conventions.md) — touching conventions extraction (candidates, evidence check, the merged skill)
+- [README.md](README.md) (API map, env) · [INSIGHTS.md](INSIGHTS.md) · [docs/](docs/README.md) · [specs/](specs/README.md)
+Skills: onion-architecture · fastify-best-practices · drizzle-orm-patterns · postgresql-table-design

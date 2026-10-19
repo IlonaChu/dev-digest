@@ -8,8 +8,8 @@ import type {
 
 /**
  * Adapter interfaces. ALL external calls go behind these interfaces.
- * Real implementations live in `apps/api/src/adapters/*`; mock implementations
- * live alongside for tests/dev (Services depend on the interface, not the impl).
+ * Real implementations live in `server/src/adapters/*`; test doubles in
+ * `server/src/adapters/mocks.ts` (Services depend on the interface, not the impl).
  */
 
 // ---------- LLM ----------

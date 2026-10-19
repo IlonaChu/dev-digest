@@ -5,13 +5,14 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Button, Dropdown, EmptyState, ErrorState, Skeleton, Icon } from "@devdigest/ui";
-import { AppShell } from "../../../../components/app-shell";
-import { useAgents, useUpdateAgent } from "../../../../lib/hooks/agents";
+import { EmptyState, ErrorState, Skeleton, Icon } from "@devdigest/ui";
+import { AppShell } from "@/components/app-shell";
+import { useAgents, useUpdateAgent } from "@/lib/hooks/agents";
+import { useAgentSkillCounts } from "@/lib/hooks/skills";
+import { AddAgentButton } from "../AddAgentButton";
 import { AgentCard } from "../AgentCard";
-import { CreateAgentModal } from "./_components/CreateAgentModal";
-import { TEMPLATES } from "./constants";
-import { filterAgents } from "./helpers";
+import { CreateAgentModal } from "../CreateAgentModal";
+import { filterAgents } from "../../helpers";
 import { s } from "./styles";
 
 export function AgentsListView() {
@@ -23,6 +24,7 @@ export function AgentsListView() {
   const [search, setSearch] = React.useState("");
 
   const list = filterAgents(agents ?? [], search);
+  const skillCounts = useAgentSkillCounts((agents ?? []).map((a) => a.id));
 
   return (
     <AppShell crumb={[{ label: t("list.breadcrumbLab") }, { label: t("list.breadcrumb") }]}>
@@ -39,28 +41,11 @@ export function AgentsListView() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("list.searchPlaceholder")}
+              aria-label={t("list.searchPlaceholder")}
               style={s.searchInput}
             />
           </div>
-          <Dropdown
-            width={220}
-            align="right"
-            trigger={
-              <Button kind="primary" size="sm" icon="Plus" iconRight="ChevronDown">
-                {t("list.addAgent")}
-              </Button>
-            }
-            items={[
-              { label: t("list.createFromScratch"), icon: "Edit", onClick: () => setCreating(true) },
-              { divider: true },
-              ...TEMPLATES.map((tp) => ({
-                label: tp,
-                icon: "Cpu" as const,
-                muted: true,
-                onClick: () => setCreating(true),
-              })),
-            ]}
-          />
+          <AddAgentButton />
         </div>
 
         {isLoading && (
@@ -86,6 +71,7 @@ export function AgentsListView() {
               <AgentCard
                 key={a.id}
                 ag={a}
+                skillCount={skillCounts[a.id]}
                 onClick={() => router.push(`/agents/${a.id}?tab=config`)}
                 onToggle={(enabled) => update.mutate({ id: a.id, patch: { enabled } })}
               />

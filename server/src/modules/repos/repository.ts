@@ -17,8 +17,42 @@ export interface InsertRepo {
   createdBy: string;
 }
 
+/** A repo as other modules see it (no Drizzle row shape). */
+export interface RepoRecord {
+  id: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  clonePath: string | null;
+  lastPolledAt: Date | null;
+}
+
+function toRecord(row: RepoRow): RepoRecord {
+  return {
+    id: row.id,
+    owner: row.owner,
+    name: row.name,
+    fullName: row.fullName,
+    clonePath: row.clonePath,
+    lastPolledAt: row.lastPolledAt,
+  };
+}
+
 export class RepoRepository {
   constructor(private db: Db) {}
+
+  async listRecords(workspaceId: string): Promise<RepoRecord[]> {
+    return (await this.list(workspaceId)).map(toRecord);
+  }
+
+  async findRecord(workspaceId: string, id: string): Promise<RepoRecord | undefined> {
+    const row = await this.getById(workspaceId, id);
+    return row ? toRecord(row) : undefined;
+  }
+
+  async markPolled(repoId: string): Promise<void> {
+    await this.db.update(t.repos).set({ lastPolledAt: new Date() }).where(eq(t.repos.id, repoId));
+  }
 
   /** Find a repo in a workspace by its `owner/name` full name (dedupe on add). */
   async findByFullName(workspaceId: string, fullName: string): Promise<RepoRow | undefined> {

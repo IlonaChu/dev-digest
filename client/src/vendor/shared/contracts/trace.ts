@@ -36,9 +36,20 @@ export const ToolCall = z.object({
 });
 export type ToolCall = z.infer<typeof ToolCall>;
 
+/** One skill block that went into the prompt, with its token cost. */
+export const PromptSkillMeta = z.object({
+  id: z.string(),
+  name: z.string(),
+  version: z.number().int(),
+  tokens: z.number().int(),
+});
+export type PromptSkillMeta = z.infer<typeof PromptSkillMeta>;
+
 export const PromptAssembly = z.object({
   system: z.string(),
   skills: z.string().nullish(),
+  /** Per-skill breakdown of `skills` (name, version, tokens); null when none. */
+  skills_meta: z.array(PromptSkillMeta).nullish(),
   memory: z.string().nullish(),
   specs: z.string().nullish(),
   /** Callers-of-changed-symbols digest (repo-intel); null when absent. */

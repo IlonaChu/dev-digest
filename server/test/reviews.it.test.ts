@@ -355,4 +355,16 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     expect(body.runs.length).toBeGreaterThanOrEqual(2);
     await app.close();
   });
+
+  it('validates the run request body: absent → 400 from the service, wrong type → 422', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const empty = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review` });
+    expect(empty.statusCode).toBe(400);
+    expect(empty.json().error.code).toBe('invalid_run_request');
+    const wrong = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { all: 'yes' } });
+    expect(wrong.statusCode).toBe(422);
+    expect(wrong.json().error.code).toBe('validation_error');
+    await app.close();
+  });
 });

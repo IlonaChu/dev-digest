@@ -64,3 +64,31 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — ## Skills / rules', () => {
+  const A = '### Skill: untested-branches (v1)\nApply when: new branches\n\nFlag untested branches.';
+  const B = '### Skill: edge-case-checklist (v2)\n\nCheck null and empty inputs.';
+
+  it('renders skill blocks in the given order, before the diff, unwrapped', () => {
+    const user = userOf({ system: 'sys', diff: 'DIFF', skills: [A, B] });
+    expect(user).toContain('## Skills / rules');
+    expect(user.indexOf(A)).toBeGreaterThan(-1);
+    expect(user.indexOf(A)).toBeLessThan(user.indexOf(B));
+    expect(user.indexOf(B)).toBeLessThan(user.indexOf('## Diff to review'));
+    // trusted slot: not fenced as untrusted data
+    expect(user).not.toContain('<untrusted source="skill');
+  });
+
+  it('records the joined blocks in the assembly for the trace', () => {
+    const { assembly } = assemblePrompt({ system: 'sys', diff: 'DIFF', skills: [A, B] });
+    expect(assembly.skills).toBe(`${A}\n\n${B}`);
+  });
+
+  it('omits the section when there are no skills', () => {
+    for (const skills of [undefined, []]) {
+      const { messages, assembly } = assemblePrompt({ system: 'sys', diff: 'DIFF', skills });
+      expect(messages[1]!.content).not.toContain('## Skills / rules');
+      expect(assembly.skills).toBeNull();
+    }
+  });
+});

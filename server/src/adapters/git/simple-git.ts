@@ -1,6 +1,6 @@
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { join } from 'node:path';
-import { mkdir, readFile, access, rm } from 'node:fs/promises';
+import { mkdir, access, rm } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import type {
   GitClient,
@@ -10,7 +10,9 @@ import type {
   BlameLine,
   GitCommit,
 } from '@devdigest/shared';
-import { parseUnifiedDiff } from './diff-parser.js';
+import { resolveInsideRoot } from '../../platform/safe-path.js';
+import { readFileInsideRoot } from '../fs/safe-read.js';
+import { parseUnifiedDiff } from '../../platform/diff-parser.js';
 
 /**
  * Depth fetched by `sync()`. Deeper than the shallow clone (CLONE_DEPTH=1) so the
@@ -112,11 +114,13 @@ export class SimpleGitClient implements GitClient {
   }
 
   async blame(repo: RepoRef, path: string): Promise<BlameLine[]> {
-    const raw = await this.git(repo).raw(['blame', '--line-porcelain', path]);
+    resolveInsideRoot(this.clonePathFor(repo), path);
+    const raw = await this.git(repo).raw(['blame', '--line-porcelain', '--', path]);
     return parseBlamePorcelain(raw);
   }
 
   async log(repo: RepoRef, path?: string): Promise<GitCommit[]> {
+    if (path !== undefined) resolveInsideRoot(this.clonePathFor(repo), path);
     const log = await this.git(repo).log(path ? { file: path } : undefined);
     return log.all.map((c) => ({
       sha: c.hash,
@@ -127,7 +131,7 @@ export class SimpleGitClient implements GitClient {
   }
 
   async readFile(repo: RepoRef, path: string): Promise<string> {
-    return readFile(join(this.clonePathFor(repo), path), 'utf8');
+    return readFileInsideRoot(this.clonePathFor(repo), path);
   }
 }
 

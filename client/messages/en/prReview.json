@@ -45,7 +45,8 @@
     "running": "Running…",
     "runReview": "Run Review",
     "mergedWarning": "Already merged — review is informational",
-    "mergedTooltip": "This PR is already merged; running a review won’t affect the merged code."
+    "mergedTooltip": "This PR is already merged; running a review won’t affect the merged code.",
+    "noAgents": "No agents yet — create one"
   },
   "runStatus": {
     "elapsed": "Running · {count} agent(s)",
@@ -131,5 +132,41 @@
     "tokens": "{count} tok",
     "noData": "No cost data for this run",
     "exact": "Run cost: ${value}"
+  },
+  "detail": {
+    "loadErrorTitle": "Couldn't load this pull request",
+    "loadErrorBody": "PR #{number} could not be loaded.",
+    "deleteRunConfirm": "Delete this run from history? (its logs are removed too)",
+    "viewOnGitHub": "View on GitHub",
+    "closedNotice": "This PR is already {status} — running a review is informational and won't affect the merged code.",
+    "tabs": {
+      "overview": "Overview",
+      "findings": "Agent runs",
+      "diff": "Files changed"
+    },
+    "description": "Description"
+  },
+  "findingsTab": {
+    "cancel": "Cancel",
+    "openTrace": "Open run trace",
+    "liveReview": "Live review",
+    "inProgress": "Review in progress…",
+    "inProgressSub": "the agent is analyzing the diff — this can take a while on large PRs.",
+    "lethalTrifecta": "Lethal Trifecta detected",
+    "lethalTrifectaCount": "{count, plural, one {# finding} other {# findings}}",
+    "timeline": "Timeline",
+    "timelineHint": "runs & commits · newest first",
+    "reviewRuns": "Review runs",
+    "reviewRunsHint": "grouped by run · newest first",
+    "emptyTitle": "No findings yet",
+    "emptyBody": "Run a review to generate findings. Use Run Review ▾ above (run all enabled agents or a specific one)."
+  },
+  "accordion": {
+    "deleteRun": "Delete this review run",
+    "deleteConfirm": "Delete this \"{agent}\" review run and its findings?",
+    "agentFallback": "agent"
+  },
+  "meta": {
+    "title": "Pull requests"
   }
 }
