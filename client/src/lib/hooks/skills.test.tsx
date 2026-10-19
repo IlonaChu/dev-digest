@@ -78,6 +78,20 @@ describe("useSetAgentSkills", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(cached()).toEqual(["a", "b"]);
   });
+
+  it("keeps the queued save's set when an earlier save fails", async () => {
+    const { pending, release } = deferredFetch();
+    const { result, cached } = setup();
+    act(() => result.current.mutate({ agentId: AGENT, links: [{ skill_id: "a", enabled: true }, { skill_id: "b", enabled: true }, { skill_id: "c", enabled: true }] }));
+    await waitFor(() => expect(pending).toHaveLength(1));
+    act(() => result.current.mutate({ agentId: AGENT, links: [{ skill_id: "a", enabled: true }, { skill_id: "b", enabled: true }, { skill_id: "c", enabled: true }, { skill_id: "d", enabled: true }] }));
+    await waitFor(() => expect(cached()).toEqual(["a", "b", "c", "d"]));
+    release(500);
+    await waitFor(() => expect(pending).toHaveLength(1));
+    expect(cached()).toEqual(["a", "b", "c", "d"]);
+    release();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
 });
 
 describe("useDeleteSkill", () => {

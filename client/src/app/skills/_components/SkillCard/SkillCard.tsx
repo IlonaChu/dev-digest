@@ -35,9 +35,9 @@ export function SkillCard({
   const reason = skillBlockReason(skill);
   const blocked = reason !== null && !skill.enabled;
   return (
-    <div style={s.card(!!active, skill.enabled, !!href)}>
+    <div className={href ? "dd-skill-card" : undefined} style={s.card(!!active, skill.enabled, !!href)}>
       <div style={s.headerRow}>
-        <span className="mono" style={s.name} title={skill.name}>
+        <span className="mono" style={s.name}>
           {href ? (
             <Link href={href} aria-current={active ? "page" : undefined} style={s.nameLink}>
               {skill.name}
@@ -74,7 +74,7 @@ export function SkillCard({
           </button>
         )}
       </div>
-      <div style={s.description} title={skill.description || undefined}>
+      <div style={{ ...s.description, ...s.aboveLink }} title={skill.description || undefined}>
         {skill.description || t("card.noDescription")}
       </div>
       <div style={s.meta}>{t("card.meta", { source: t(`source.${skill.source}`), version: skill.version })}</div>

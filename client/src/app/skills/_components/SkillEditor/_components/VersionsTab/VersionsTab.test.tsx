@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, within , act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import type { Skill, SkillVersion } from "@devdigest/shared";
@@ -101,6 +101,8 @@ describe("skill VersionsTab", () => {
     const { posts } = setup();
     fireEvent.click(within(await row("v1")).getByRole("button", { name: "Restore" }));
     expect(confirm).toHaveBeenCalledWith("Restore v1? This saves a new version with that text.");
+    // the mutation starts a microtask later (onMutate is awaited): flush before asserting "nothing"
+    await act(async () => {});
     expect(posts()).toHaveLength(0);
   });
 });

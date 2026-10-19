@@ -7,9 +7,10 @@
  * Safety: `listEntries` uses a filter that never returns true, so fflate walks
  * the central directory and inflates NOTHING. `readText` inflates exactly one
  * named entry, and only when its DECLARED size is ≤ `maxBytes`. fflate inflates
- * into a fixed buffer of that declared size and never grows it, so memory stays
- * capped even when the header lies (zip bomb): the extra output is dropped and
- * the text comes back cut at the declared size. Decoding time is bounded by the
+ * into a fixed buffer of that declared size and never grows it, so a DEFLATED
+ * entry whose header lies comes back cut at the declared size. A STORED entry
+ * (compression 0) is sliced by its real compressed size instead, so the result is
+ * re-checked against `maxBytes` after reading. Decoding time is bounded by the
  * archive cap the caller enforces on the compressed input.
  */
 import { unzipSync, strFromU8 } from 'fflate';
@@ -47,6 +48,7 @@ export class FflateArchiveReader implements ArchiveReader {
     });
     const bytes = files[path];
     if (!bytes) throw new Error(`Entry "${path}" not found or larger than ${maxBytes} bytes`);
+    if (bytes.byteLength > maxBytes) throw new Error(`Entry "${path}" is larger than ${maxBytes} bytes`);
     return strFromU8(bytes);
   }
 }

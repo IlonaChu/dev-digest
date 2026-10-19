@@ -19,6 +19,9 @@ import { changedFields, createsVersion, formFrom } from "./helpers";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { s } from "./styles";
 
+/** Pending flip: ignore clicks but keep the switch enabled, so a keyboard user keeps focus. */
+const ignoreToggle = () => {};
+
 export function ConfigTab({ skill }: { skill: Skill }) {
   const t = useTranslations("skills");
   const toast = useToast();
@@ -68,9 +71,9 @@ export function ConfigTab({ skill }: { skill: Skill }) {
           {t("config.enabled")}
           <Toggle
             on={skill.enabled}
-            onChange={setEnabled}
+            onChange={toggle.isPending ? ignoreToggle : setEnabled}
             size={16}
-            disabled={enableLocked || toggle.isPending}
+            disabled={enableLocked}
             aria-describedby={enableLocked ? blockedNoteId : undefined}
           />
         </label>

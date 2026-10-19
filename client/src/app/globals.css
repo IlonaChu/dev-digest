@@ -30,6 +30,15 @@
   opacity: 1;
 }
 
+/* Skill card: the focusable name link is clipped by its nowrap box, so the card draws the ring. */
+.dd-skill-card:has(a:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.dd-skill-card a:focus-visible {
+  outline: none;
+}
+
 /* Skill import drop zone: its file input is visually hidden but focusable, so the zone
    shows the keyboard focus ring for it (inline styles cannot target :has/:focus-visible). */
 .dd-file-drop:has(input:focus-visible) {

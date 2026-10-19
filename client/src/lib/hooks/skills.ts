@@ -219,7 +219,11 @@ export function useSetAgentSkills() {
       return { previous };
     },
     onError: (_err, { agentId }, ctx) => {
-      if (ctx?.previous) qc.setQueryData(skillKeys.agentLinks(agentId), ctx.previous);
+      // Roll back only when nothing is queued behind this save: a later save already wrote its
+      // own full set, and restoring `previous` would put the pre-click set back on screen.
+      if (ctx?.previous && qc.isMutating({ mutationKey: SET_AGENT_SKILLS_KEY }) === 1) {
+        qc.setQueryData(skillKeys.agentLinks(agentId), ctx.previous);
+      }
     },
     onSettled: (_d, _err, { agentId }) => {
       // agent_count on the skill cards changed
